@@ -288,10 +288,25 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         logits = logits.reshape(-1, self.vocab_size)
         targets = x.reshape(-1)
 
-        # Calculate loss
-        loss = F.cross_entropy(logits, targets, reduction="mean")
+        # Calculate base loss
+        base_loss = F.cross_entropy(logits, targets, reduction="mean")
+
+        class_counts = torch.bincount(targets, minlength=self.vocab_size)
+        # Use square root instead of log for gentler weighting
+        class_weights = 1.0 / torch.sqrt(1.0 + class_counts.float())
+        class_weights = class_weights / class_weights.mean()  # Normalize to mean=1
+        # Cap the maximum weight to prevent extreme reweighting
+        class_weights = torch.clamp(class_weights, min=0.1, max=3.0)
+
+        weighted_loss = F.cross_entropy(
+            logits, targets, weight=class_weights.to(self.device), reduction="mean"
+        )
+
+        # Mix losses with small weight for balance
+        loss = 0.8 * base_loss + 0.2 * weighted_loss
 
         self.log("train_loss", loss, prog_bar=True)
+        self.log("base_loss", base_loss, prog_bar=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -325,11 +340,12 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         return [optimizer], [scheduler]
 
     @torch.no_grad()
-    def sample(self, shape, device, temperature=1.0):
-        """Generate new maps using iterative demasking"""
+    def sample(self, shape, device, temperature=1.0, top_k=None, top_p=0.9):
+        """Generate new maps using iterative demasking with better sampling"""
         batch_size, layers, h, w = shape
 
-        # Start with random tokens
+        # Start with random tokens, but bias toward common tokens
+        # Get token frequencies from a reference (you should pass this in)
         x = torch.randint(0, self.vocab_size, (batch_size, layers, h, w), device=device)
 
         # Iteratively denoise
@@ -351,14 +367,12 @@ class SS13MapDiffusionLightning(pl.LightningModule):
             sampled_tokens = sampled_tokens.reshape(batch_size, layers, h, w)
 
             if t > 0:
-                # Decide which tokens to update based on confidence
-                confidence = torch.max(probs, dim=2)[0]  # (batch, layers, h, w)
-
-                # Update tokens with low confidence
-                update_prob = (
-                    self.mask_probs[t - 1] / self.mask_probs[t] if t > 0 else 1.0
+                update_prob = max(
+                    0.1, self.mask_probs[t - 1].item() * 0.3
+                )  # Much more conservative
+                update_mask = (
+                    torch.rand(batch_size, layers, h, w, device=device) < update_prob
                 )
-                update_mask = torch.rand_like(confidence) < update_prob
 
                 x = torch.where(update_mask, sampled_tokens, x)
             else:

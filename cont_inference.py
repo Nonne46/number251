@@ -107,7 +107,7 @@ class SS13ContinuousGenerator(SS13MapGenerator):
         # Generate initial chunk if starting from scratch
         if initial_map is None:
             print("\nGenerating initial chunk...")
-            initial = self._sample_batch(
+            initial = self._sample_batch_basic(
                 1, chunk_size, chunk_size, temperature, show_progress=True
             )[0]
             full_map[:, :chunk_size, :chunk_size] = initial
@@ -262,21 +262,7 @@ class SS13ContinuousGenerator(SS13MapGenerator):
                 num_samples=1,
             ).reshape(batch_size, layers, h, w)
 
-            # Only update tokens in generation area
-            if t > 0:
-                alpha_t = self.model.alphas_cumprod[t]
-                alpha_prev = self.model.alphas_cumprod[t - 1]
-
-                # Probability of replacing with predicted vs keeping noisy
-                replace_prob = (alpha_t - alpha_prev) / alpha_t
-                replace_mask = torch.rand_like(x, dtype=torch.float32) < replace_prob
-
-                # Apply both masks: only update in generation area
-                combined_mask = replace_mask & mask_expanded.unsqueeze(0)
-                x[combined_mask] = x_pred[combined_mask]
-            else:
-                # Final step: only update generation area
-                x[0][mask_expanded] = x_pred[0][mask_expanded]
+            x = x_pred
 
         return x
 
