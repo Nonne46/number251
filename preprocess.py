@@ -6,29 +6,30 @@ from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
-
-# HuggingFace datasets
 from datasets import Dataset
 from tqdm import tqdm
 
-# Import your tokenizer (assuming it's in the same directory)
-from tokenizer import SS13MapTokenizer
+from tokenizer import MapTensor, SS13MapTokenizer
 
 
 @dataclass
 class ChunkConfig:
     """Configuration for map chunking"""
 
-    target_size: Tuple[int, int] = (10, 10)
-    overlap_percent: float = 0.2  # 20% overlap between chunks
-    min_content_ratio: float = 0.1  # Minimum non-empty content to keep chunk
+    target_size: Tuple[int, int] = (16, 16)
+    stride: Tuple[int, int] = (8, 8)  # Step size for sliding window
+    min_content_ratio: float = 0.05  # Minimum non-empty content to keep chunk
+    max_dominance_ratio: float = 0.8  # Max ratio for any single token
+    min_variety: int = 3  # Minimum unique meaningful tokens
+    augment: bool = True
+    augment_variations: int = 4  # How many augmented versions per chunk
 
 
 class SS13MapPreprocessor:
     def __init__(
         self,
         tokenizer_path: str,
-        max_layers: int = 8,
+        max_layers: int = 16,
         chunk_config: Optional[ChunkConfig] = None,
     ):
         """
@@ -56,42 +57,87 @@ class SS13MapPreprocessor:
         self, map_shape: Tuple[int, int]
     ) -> List[Tuple[int, int, int, int]]:
         """
-        Calculate chunk positions for a map
+        Calculate chunk positions for a map using sliding window
 
         Returns:
             List of (start_y, end_y, start_x, end_x) tuples
         """
         height, width = map_shape
         target_h, target_w = self.chunk_config.target_size
+        stride_h, stride_w = self.chunk_config.stride
 
         # If map is smaller than target, return single chunk (will be padded)
         if height <= target_h and width <= target_w:
             return [(0, height, 0, width)]
 
         chunks = []
-        overlap_h = int(target_h * self.chunk_config.overlap_percent)
-        overlap_w = int(target_w * self.chunk_config.overlap_percent)
 
-        step_h = target_h - overlap_h
-        step_w = target_w - overlap_w
+        # Generate chunk positions with sliding window
+        for y in range(0, height - target_h + 1, stride_h):
+            for x in range(0, width - target_w + 1, stride_w):
+                chunks.append((y, y + target_h, x, x + target_w))
 
-        # Generate chunk positions
-        for y in range(0, height, step_h):
-            for x in range(0, width, step_w):
-                end_y = min(y + target_h, height)
-                end_x = min(x + target_w, width)
+        # Add edge chunks if there's remaining space
+        # Right edge
+        if width % stride_w != 0 and width > target_w:
+            for y in range(0, height - target_h + 1, stride_h):
+                chunks.append((y, y + target_h, width - target_w, width))
 
-                # Adjust start position if we're at the edge
-                start_y = max(0, end_y - target_h)
-                start_x = max(0, end_x - target_w)
+        # Bottom edge
+        if height % stride_h != 0 and height > target_h:
+            for x in range(0, width - target_w + 1, stride_w):
+                chunks.append((height - target_h, height, x, x + target_w))
 
-                chunks.append((start_y, end_y, start_x, end_x))
+        # Bottom-right corner
+        if height > target_h and width > target_w:
+            chunks.append((height - target_h, height, width - target_w, width))
+
+        # Remove duplicates
+        chunks = list(set(chunks))
 
         return chunks
 
+    def augment_chunk(
+        self, data: np.ndarray, mask: np.ndarray
+    ) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """
+        Generate augmented versions of a chunk
+
+        Yields:
+            Augmented (data, mask) tuples
+        """
+        # Original
+        yield data, mask
+
+        if not self.chunk_config.augment:
+            return
+
+        # Rotations (90, 180, 270 degrees)
+        for k in [1, 2, 3]:
+            rotated_data = np.rot90(data, k, axes=(1, 2))
+            rotated_mask = np.rot90(mask, k, axes=(1, 2))
+            yield rotated_data, rotated_mask
+
+        # Flips (only if we want more variations)
+        if self.chunk_config.augment_variations > 4:
+            # Horizontal flip
+            h_flip_data = np.flip(data, axis=2)
+            h_flip_mask = np.flip(mask, axis=2)
+            yield h_flip_data.copy(), h_flip_mask.copy()
+
+            # Vertical flip
+            v_flip_data = np.flip(data, axis=1)
+            v_flip_mask = np.flip(mask, axis=1)
+            yield v_flip_data.copy(), v_flip_mask.copy()
+
+            # Both flips (equivalent to 180 rotation but different ordering)
+            hv_flip_data = np.flip(np.flip(data, axis=1), axis=2)
+            hv_flip_mask = np.flip(np.flip(mask, axis=1), axis=2)
+            yield hv_flip_data.copy(), hv_flip_mask.copy()
+
     def extract_chunk(
         self, map_tensor, chunk_bounds: Tuple[int, int, int, int]
-    ) -> Optional[object]:
+    ) -> Optional[MapTensor]:
         """
         Extract a chunk from the map tensor
 
@@ -108,19 +154,39 @@ class SS13MapPreprocessor:
         chunk_data = map_tensor.data[:, start_y:end_y, start_x:end_x]
         chunk_mask = map_tensor.mask[:, start_y:end_y, start_x:end_x]
 
-        # Check content ratio
-        total_positions = np.sum(chunk_mask)
-        non_empty_positions = np.sum(
-            (chunk_data != self.tokenizer.EMPTY_ID)
-            & (chunk_data != self.tokenizer.PAD_ID)
-            & chunk_mask
-        )
+        # Check variety in layer 0 (turfs) - this is the most important layer
+        turf_layer = chunk_data[0]
+        turf_mask = chunk_mask[0]
 
-        if (
-            total_positions == 0
-            or (non_empty_positions / total_positions)
-            < self.chunk_config.min_content_ratio
-        ):
+        if np.sum(turf_mask) == 0:
+            return None
+
+        # Count occurrences of each token in the turf layer
+        unique_tokens, counts = np.unique(turf_layer[turf_mask], return_counts=True)
+        total_positions = np.sum(turf_mask)
+
+        # Find the most common token and its ratio
+        max_count = np.max(counts)
+        dominance_ratio = max_count / total_positions
+
+        # Reject if one token dominates too much
+        if dominance_ratio > self.chunk_config.max_dominance_ratio:
+            return None
+
+        # Also check if there's enough variety across all layers
+        all_tokens = []
+        for layer in range(len(chunk_data)):
+            layer_tokens = chunk_data[layer][chunk_mask[layer]]
+            # Exclude empty and pad tokens from variety count
+            meaningful_tokens = layer_tokens[
+                (layer_tokens != self.tokenizer.EMPTY_ID)
+                & (layer_tokens != self.tokenizer.PAD_ID)
+            ]
+            all_tokens.extend(meaningful_tokens)
+
+        # Need at least some minimum variety
+        unique_meaningful = len(np.unique(all_tokens))
+        if unique_meaningful < self.chunk_config.min_variety:
             return None
 
         # Create new tensor with chunk data
@@ -144,9 +210,6 @@ class SS13MapPreprocessor:
             padded_data[:, :h, :w] = chunk_data
             padded_mask[:, :h, :w] = chunk_mask
 
-            # Create padded tensor object
-            from tokenizer import MapTensor  # Assuming this exists in your tokenizer
-
             return MapTensor(
                 data=padded_data,
                 mask=padded_mask,
@@ -155,11 +218,9 @@ class SS13MapPreprocessor:
             )
         else:
             # No padding needed
-            from tokenizer import MapTensor
-
             return MapTensor(
-                data=chunk_data,
-                mask=chunk_mask,
+                data=chunk_data.copy(),
+                mask=chunk_mask.copy(),
                 original_shape=chunk_shape,
                 padding=(0, 0, 0, 0),
             )
@@ -186,29 +247,53 @@ class SS13MapPreprocessor:
             chunks = self.calculate_chunks(map_tensor.original_shape)
 
             # Process each chunk
-            for i, chunk_bounds in enumerate(chunks):
+            chunk_id = 0
+            valid_chunks = 0
+
+            for chunk_bounds in chunks:
                 chunk_tensor = self.extract_chunk(map_tensor, chunk_bounds)
 
                 if chunk_tensor is None:
                     continue
 
-                # Create training example
-                example = {
-                    "map_name": map_path.stem,
-                    "chunk_id": i,
-                    "chunk_bounds": chunk_bounds,
-                    "original_shape": map_tensor.original_shape,
-                    "tensor_data": chunk_tensor.data.tolist(),  # Convert to list for JSON serialization
-                    "tensor_mask": chunk_tensor.mask.tolist(),
-                    "padding": chunk_tensor.padding,
-                }
+                valid_chunks += 1
 
-                yield example
+                # Generate augmented versions
+                for aug_idx, (aug_data, aug_mask) in enumerate(
+                    self.augment_chunk(chunk_tensor.data, chunk_tensor.mask)
+                ):
+                    # Stop if we've generated enough variations
+                    if aug_idx >= self.chunk_config.augment_variations:
+                        break
+
+                    # Create training example
+                    example = {
+                        "map_name": map_path.stem,
+                        "chunk_id": chunk_id,
+                        "augmentation_id": aug_idx,
+                        "chunk_bounds": chunk_bounds,
+                        "original_shape": list(map_tensor.original_shape),
+                        "tensor_data": aug_data.tolist(),
+                        "tensor_mask": aug_mask.tolist(),
+                        "padding": chunk_tensor.padding,
+                    }
+
+                    yield example
+                    chunk_id += 1
+
+            # Log if we filtered out many chunks
+            if valid_chunks < len(chunks) * 0.1:  # Less than 10% valid
+                print(
+                    f"  Warning: {map_path.name} had only {valid_chunks}/{len(chunks)} valid chunks"
+                )
 
         except Exception as e:
             print(f"Error processing {map_path}: {e}")
+            import traceback
 
-    def process_maps(self, map_dir: str, output_dir: str = "./processed_maps"):
+            traceback.print_exc()
+
+    def process_maps(self, map_dir: str, output_dir: str = "./ss13_map_dataset"):
         """
         Process all maps and create HuggingFace dataset
 
@@ -219,15 +304,34 @@ class SS13MapPreprocessor:
         # Load map files
         map_files = self.load_map_files(map_dir)
 
+        if not map_files:
+            print("No map files found!")
+            return None
+
         # Process all maps
         all_examples = []
 
         print("Processing maps...")
-        for map_path in tqdm(map_files, desc="Processing maps"):
-            for example in self.process_single_map(map_path):
-                all_examples.append(example)
+        print(
+            f"Chunk config: size={self.chunk_config.target_size}, stride={self.chunk_config.stride}"
+        )
+        print(
+            f"Filtering: max_dominance={self.chunk_config.max_dominance_ratio}, min_variety={self.chunk_config.min_variety}"
+        )
 
-        print(f"Generated {len(all_examples)} training examples")
+        for map_path in tqdm(map_files, desc="Processing maps"):
+            map_examples = list(self.process_single_map(map_path))
+            all_examples.extend(map_examples)
+
+            # Print progress info
+            if len(map_examples) > 0:
+                print(f"  {map_path.name}: {len(map_examples)} examples")
+
+        print(f"\nGenerated {len(all_examples)} total training examples")
+
+        if not all_examples:
+            print("No valid examples generated!")
+            return None
 
         # Create HuggingFace dataset
         dataset = Dataset.from_list(all_examples)
@@ -240,7 +344,11 @@ class SS13MapPreprocessor:
         tokenizer_config = {
             "vocab_size": self.tokenizer.get_vocab_size(),
             "max_layers": self.tokenizer.max_layers,
-            "target_size": self.chunk_config.target_size,
+            "target_size": list(self.chunk_config.target_size),
+            "stride": list(self.chunk_config.stride),
+            "max_dominance_ratio": self.chunk_config.max_dominance_ratio,
+            "min_variety": self.chunk_config.min_variety,
+            "augmentations_per_chunk": self.chunk_config.augment_variations,
             "reserved_tokens": {
                 "EMPTY_ID": self.tokenizer.EMPTY_ID,
                 "UNK_ID": self.tokenizer.UNK_ID,
@@ -252,8 +360,13 @@ class SS13MapPreprocessor:
         with open(os.path.join(output_dir, "tokenizer_config.json"), "w") as f:
             json.dump(tokenizer_config, f, indent=2)
 
-        print(f"Dataset saved to {output_dir}")
+        print(f"\nDataset saved to {output_dir}")
         print(f"Total examples: {len(dataset)}")
+
+        # Print some statistics
+        print("\nDataset statistics:")
+        print(f"  Unique maps: {len(set(ex['map_name'] for ex in all_examples))}")
+        print(f"  Average examples per map: {len(all_examples) / len(map_files):.1f}")
 
         return dataset
 
@@ -265,20 +378,38 @@ def main():
     )
     parser.add_argument("--tokenizer_path", required=True, help="Path to tiles.json")
     parser.add_argument(
-        "--output_dir", default="./processed_maps", help="Output directory"
+        "--output_dir", default="./ss13_map_dataset", help="Output directory"
     )
-    parser.add_argument("--max_layers", type=int, default=8, help="Maximum layers")
+    parser.add_argument("--max_layers", type=int, default=16, help="Maximum layers")
     parser.add_argument(
-        "--target_size", nargs=2, type=int, default=[10, 10], help="Target chunk size"
+        "--target_size", nargs=2, type=int, default=[16, 16], help="Target chunk size"
     )
     parser.add_argument(
-        "--overlap", type=float, default=0.2, help="Overlap percentage for chunking"
+        "--stride", nargs=2, type=int, default=[8, 8], help="Stride for sliding window"
     )
     parser.add_argument(
         "--min_content",
         type=float,
-        default=0.1,
+        default=0.05,
         help="Minimum content ratio for chunks",
+    )
+    parser.add_argument(
+        "--max_dominance",
+        type=float,
+        default=0.8,
+        help="Maximum dominance ratio for single token",
+    )
+    parser.add_argument(
+        "--min_variety", type=int, default=3, help="Minimum variety of tokens"
+    )
+    parser.add_argument(
+        "--no_augment", action="store_true", help="Disable augmentation"
+    )
+    parser.add_argument(
+        "--augment_variations",
+        type=int,
+        default=4,
+        help="Number of augmented versions per chunk",
     )
 
     args = parser.parse_args()
@@ -286,8 +417,12 @@ def main():
     # Create chunk config
     chunk_config = ChunkConfig(
         target_size=tuple(args.target_size),
-        overlap_percent=args.overlap,
+        stride=tuple(args.stride),
         min_content_ratio=args.min_content,
+        max_dominance_ratio=args.max_dominance,
+        min_variety=args.min_variety,
+        augment=not args.no_augment,
+        augment_variations=args.augment_variations,
     )
 
     # Create preprocessor
@@ -300,7 +435,8 @@ def main():
     # Process maps
     dataset = preprocessor.process_maps(args.map_dir, args.output_dir)
 
-    print("Preprocessing complete!")
+    if dataset:
+        print("\nPreprocessing complete!")
 
 
 if __name__ == "__main__":

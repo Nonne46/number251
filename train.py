@@ -1,20 +1,26 @@
+import argparse
 import json
+import os
 import random
 
 import numpy as np
 import pytorch_lightning as pl
 import torch
 from datasets import load_from_disk
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+)
+from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader, Dataset
 
 from models import SS13MapDiffusionLightning
 
 
 class SS13MapDataset(Dataset):
-    def __init__(self, hf_dataset, augment=True):
+    def __init__(self, hf_dataset):
         self.dataset = hf_dataset
-        self.augment = augment
 
     def __len__(self):
         return len(self.dataset)
@@ -26,23 +32,6 @@ class SS13MapDataset(Dataset):
         tensor_data = np.array(item["tensor_data"], dtype=np.int64)
         tensor_mask = np.array(item["tensor_mask"], dtype=bool)
 
-        # Apply augmentations
-        # if self.augment and random.random() < 0.5:
-        #     # Random rotation (0, 90, 180, 270 degrees)
-        #     k = random.randint(0, 3)
-        #     if k > 0:
-        #         tensor_data = np.rot90(tensor_data, k, axes=(1, 2))
-        #         tensor_mask = np.rot90(tensor_mask, k, axes=(1, 2))
-        #
-        #     # Random flips
-        #     if random.random() < 0.5:
-        #         tensor_data = np.flip(tensor_data, axis=1).copy()  # Vertical flip
-        #         tensor_mask = np.flip(tensor_mask, axis=1).copy()
-        #
-        #     if random.random() < 0.5:
-        #         tensor_data = np.flip(tensor_data, axis=2).copy()  # Horizontal flip
-        #         tensor_mask = np.flip(tensor_mask, axis=2).copy()
-
         return {
             "tensor_data": tensor_data,
             "tensor_mask": tensor_mask,
@@ -51,107 +40,243 @@ class SS13MapDataset(Dataset):
         }
 
 
+def load_tokenizer_config(dataset_path):
+    """Load tokenizer config from dataset directory"""
+    config_path = os.path.join(dataset_path, "tokenizer_config.json")
+
+    if os.path.exists(config_path):
+        print(f"Loading tokenizer config from dataset: {config_path}")
+        with open(config_path, "r") as f:
+            return json.load(f)
+    else:
+        print(f"Warning: No tokenizer config found in dataset directory")
+        return None
+
+
 def main():
-    # Configuration
-    batch_size = 16  # Reduced for 16 layers
-    num_epochs = 100
-    learning_rate = 1e-4
-    num_workers = 4
-    val_split = 0.1
+    parser = argparse.ArgumentParser(description="Train SS13 Map Diffusion Model")
 
-    # Load tokenizer config to get vocab size
-    with open("tiles.json", "r") as f:
-        tokenizer_config = json.load(f)
-    vocab_size = len(tokenizer_config["token_to_id"])
+    # Dataset arguments
+    parser.add_argument(
+        "--dataset_path",
+        type=str,
+        default="./ss13_map_dataset",
+        help="Path to preprocessed dataset directory",
+    )
+    parser.add_argument(
+        "--tokenizer_path",
+        type=str,
+        default="tiles.json",
+        help="Path to tokenizer JSON file (fallback if not in dataset)",
+    )
 
-    print(f"Vocabulary size: {vocab_size}")
-    print(f"Max layers: 16")
-    print(f"Target size: 16x16")
+    # Training arguments
+    parser.add_argument(
+        "--batch_size", type=int, default=16, help="Batch size for training"
+    )
+    parser.add_argument(
+        "--max_epochs", type=int, default=100, help="Maximum number of epochs"
+    )
+    parser.add_argument(
+        "--learning_rate", type=float, default=1e-4, help="Learning rate"
+    )
+    parser.add_argument(
+        "--val_split", type=float, default=0.1, help="Validation split ratio"
+    )
+    parser.add_argument(
+        "--num_workers", type=int, default=4, help="Number of dataloader workers"
+    )
+
+    # Model arguments
+    parser.add_argument(
+        "--base_channels", type=int, default=64, help="Base channels for U-Net"
+    )
+    parser.add_argument(
+        "--timesteps", type=int, default=1000, help="Number of diffusion timesteps"
+    )
+
+    # Experiment arguments
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default="ss13_diffusion",
+        help="Name for this experiment",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=None,
+        help="Path to checkpoint to resume training from",
+    )
+    parser.add_argument("--seed", type=int, default=31337, help="Random seed")
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Set random seeds
+    pl.seed_everything(args.seed)
 
     # Load dataset
-    print("Loading dataset...")
-    dataset = load_from_disk("./dataset/")
+    print(f"Loading dataset from {args.dataset_path}...")
+    dataset = load_from_disk(args.dataset_path)
+
+    # Try to load tokenizer config from dataset first
+    dataset_tokenizer_config = load_tokenizer_config(args.dataset_path)
+
+    if dataset_tokenizer_config:
+        vocab_size = dataset_tokenizer_config["vocab_size"]
+        max_layers = dataset_tokenizer_config["max_layers"]
+        target_size = dataset_tokenizer_config.get("target_size", [16, 16])
+    else:
+        # Fallback to loading from tokenizer file
+        print(f"Loading tokenizer from {args.tokenizer_path}...")
+        with open(args.tokenizer_path, "r") as f:
+            tokenizer_config = json.load(f)
+        vocab_size = len(tokenizer_config["token_to_id"])
+        max_layers = 16  # Default
+        target_size = [16, 16]  # Default
+
+    print(f"Vocabulary size: {vocab_size}")
+    print(f"Max layers: {max_layers}")
+    print(f"Target size: {target_size[0]}x{target_size[1]}")
 
     # Split dataset
     dataset_size = len(dataset)
-    val_size = int(dataset_size * val_split)
+    val_size = int(dataset_size * args.val_split)
     train_size = dataset_size - val_size
 
     # Shuffle and split
-    dataset = dataset.shuffle(seed=31337)
+    dataset = dataset.shuffle(seed=args.seed)
     train_dataset = dataset.select(range(train_size))
     val_dataset = dataset.select(range(train_size, dataset_size))
 
     print(f"Train samples: {len(train_dataset)}")
     print(f"Validation samples: {len(val_dataset)}")
 
+    # Print some dataset statistics
+    unique_maps = len(set(item["map_name"] for item in train_dataset))
+    print(f"Unique maps in training set: {unique_maps}")
+
     # Create PyTorch datasets
-    train_pytorch_dataset = SS13MapDataset(train_dataset, augment=True)
-    val_pytorch_dataset = SS13MapDataset(val_dataset, augment=False)
+    train_pytorch_dataset = SS13MapDataset(train_dataset)
+    val_pytorch_dataset = SS13MapDataset(val_dataset)
 
     # Create dataloaders
     train_loader = DataLoader(
         train_pytorch_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=True,
-        num_workers=num_workers,
+        num_workers=args.num_workers,
         pin_memory=True,
+        persistent_workers=True if args.num_workers > 0 else False,
     )
 
     val_loader = DataLoader(
         val_pytorch_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=False,
-        num_workers=num_workers,
+        num_workers=args.num_workers,
         pin_memory=True,
+        persistent_workers=True if args.num_workers > 0 else False,
     )
 
-    # Initialize model
-    model = SS13MapDiffusionLightning(
-        vocab_size=vocab_size,
-        layers=16,
-        base_channels=64,
-        timesteps=1000,
-        learning_rate=learning_rate,
+    # Initialize or load model
+    if args.checkpoint:
+        print(f"Loading model from checkpoint: {args.checkpoint}")
+        model = SS13MapDiffusionLightning.load_from_checkpoint(
+            args.checkpoint,
+            vocab_size=vocab_size,
+            layers=max_layers,
+            base_channels=args.base_channels,
+            timesteps=args.timesteps,
+            learning_rate=args.learning_rate,
+        )
+    else:
+        print("Initializing new model...")
+        model = SS13MapDiffusionLightning(
+            vocab_size=vocab_size,
+            layers=max_layers,
+            base_channels=args.base_channels,
+            timesteps=args.timesteps,
+            learning_rate=args.learning_rate,
+        )
+
+    # Create experiment directory
+    experiment_dir = f"experiments/{args.experiment_name}"
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    # Save training config
+    training_config = {
+        "dataset_path": args.dataset_path,
+        "vocab_size": vocab_size,
+        "max_layers": max_layers,
+        "target_size": target_size,
+        "batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "max_epochs": args.max_epochs,
+        "timesteps": args.timesteps,
+        "base_channels": args.base_channels,
+        "train_samples": len(train_dataset),
+        "val_samples": len(val_dataset),
+        "seed": args.seed,
+    }
+
+    with open(os.path.join(experiment_dir, "training_config.json"), "w") as f:
+        json.dump(training_config, f, indent=2)
+
+    # Logger
+    logger = TensorBoardLogger(
+        save_dir="logs",
+        name=args.experiment_name,
     )
 
     # Callbacks
     checkpoint_callback = ModelCheckpoint(
-        dirpath="checkpoints",
-        filename="ss13-diffusion-{epoch:02d}-{val_loss:.2f}",
+        dirpath=os.path.join(experiment_dir, "checkpoints"),
+        filename="epoch={epoch:02d}-val_loss={val_loss:.3f}",
         save_top_k=3,
         monitor="val_loss",
         mode="min",
+        save_last=True,
+        every_n_epochs=1,
     )
 
-    early_stop_callback = EarlyStopping(monitor="val_loss", patience=10, mode="min")
+    # early_stop_callback = EarlyStopping(
+    #     monitor="val_loss",
+    #     patience=80,
+    #     mode="min",
+    #     verbose=False,
+    # )
+
+    lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     # Trainer
     trainer = pl.Trainer(
-        max_epochs=num_epochs,
-        accelerator="gpu" if torch.cuda.is_available() else "cpu",
+        max_epochs=args.max_epochs,
+        accelerator="cuda" if torch.cuda.is_available() else "cpu",
         devices=1,
-        callbacks=[checkpoint_callback, early_stop_callback],
+        callbacks=[checkpoint_callback, lr_monitor],
         gradient_clip_val=1.0,
         log_every_n_steps=10,
-        val_check_interval=0.5,  # Check validation 4 times per epoch
+        val_check_interval=0.5,
+        logger=logger,
+        enable_progress_bar=True,
+        enable_checkpointing=True,
     )
 
     # Train
-    print("Starting training...")
-    trainer.fit(model, train_loader, val_loader)
+    print(f"\nStarting training for experiment: {args.experiment_name}")
+    print(f"Logs will be saved to: logs/{args.experiment_name}")
+    print(f"Checkpoints will be saved to: {experiment_dir}/checkpoints")
 
-    # Test generation after training
-    print("\nGenerating sample maps...")
-    model.eval()
-    with torch.no_grad():
-        # Generate 4 16x16 maps
-        generated = model.sample(
-            shape=(4, 16, 16, 16), device=model.device  # (batch, layers, height, width)
-        )
+    if args.checkpoint:
+        # Resume training from checkpoint
+        trainer.fit(model, train_loader, val_loader, ckpt_path=args.checkpoint)
+    else:
+        # Start fresh training
+        trainer.fit(model, train_loader, val_loader)
 
-        print(f"Generated shape: {generated.shape}")
-        print(f"Unique tokens in layer 0: {torch.unique(generated[:, 0])}")
+    print(f"\nTraining complete! Results saved to {experiment_dir}")
 
 
 if __name__ == "__main__":

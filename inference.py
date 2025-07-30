@@ -125,13 +125,12 @@ class SS13MapGenerator:
         # Dictionary to store unique tile combinations
         tile_combinations = {}
         combination_to_letter = {}
-        letter_index = 0
-        available_letters = list(string.ascii_letters)  # a-z, A-Z
 
         # Grid to store letter codes
         grid = [[None for _ in range(width)] for _ in range(height)]
 
-        # Process each position
+        # First pass: collect all unique combinations
+        all_combinations = []
         for y in range(height):
             for x in range(width):
                 # Get all objects at this position
@@ -162,7 +161,7 @@ class SS13MapGenerator:
                         token_id, f"<UNK:{token_id}>"
                     )
 
-                    # Skip special tokens and areas (areas are part of turf definition)
+                    # Skip special tokens and areas
                     if token in [
                         "<PAD>",
                         "<MASK>",
@@ -182,19 +181,73 @@ class SS13MapGenerator:
 
                 # Create tuple for unique combination
                 combination = tuple(objects_at_pos)
+                if combination not in all_combinations:
+                    all_combinations.append(combination)
 
-                # Get or create letter for this combination
-                if combination not in combination_to_letter:
-                    if letter_index < len(available_letters):
-                        letter = available_letters[letter_index]
-                    else:
-                        # If we run out of letters, use multi-character codes
-                        letter = f"X{letter_index - len(available_letters)}"
+        # Determine key format based on number of unique combinations
+        num_combinations = len(all_combinations)
 
-                    combination_to_letter[combination] = letter
-                    tile_combinations[letter] = combination
-                    letter_index += 1
+        # Available single characters: a-z, A-Z, 0-9
+        single_chars = list(
+            string.ascii_lowercase + string.ascii_uppercase + string.digits
+        )
 
+        if num_combinations <= len(single_chars):
+            # Use single character keys
+            for i, combination in enumerate(all_combinations):
+                key = single_chars[i]
+                combination_to_letter[combination] = key
+                tile_combinations[key] = combination
+        else:
+            # Use two-character keys for consistency
+            # Generate all two-character combinations
+            key_index = 0
+            for i, combination in enumerate(all_combinations):
+                # Create two-character key
+                first_char = single_chars[key_index // len(single_chars)]
+                second_char = single_chars[key_index % len(single_chars)]
+                key = first_char + second_char
+
+                combination_to_letter[combination] = key
+                tile_combinations[key] = combination
+                key_index += 1
+
+        # Second pass: build the grid
+        for y in range(height):
+            for x in range(width):
+                # Recreate the combination for this position
+                objects_at_pos = []
+
+                # First, get the turf
+                turf_token_id = int(tensor_map[0, y, x])
+                if turf_token_id != self.tokenizer.EMPTY_ID:
+                    turf_token = self.tokenizer.id_to_token.get(turf_token_id, "")
+                    if turf_token.startswith("/turf/"):
+                        objects_at_pos.append(turf_token)
+
+                # Then add other objects
+                for layer in range(1, layers):
+                    token_id = int(tensor_map[layer, y, x])
+                    if token_id == self.tokenizer.EMPTY_ID:
+                        continue
+
+                    token = self.tokenizer.id_to_token.get(token_id, "")
+                    if token not in [
+                        "<PAD>",
+                        "<MASK>",
+                        "<UNK>",
+                        "<EMPTY>",
+                    ] and not token.startswith("/area/"):
+                        objects_at_pos.append(token)
+
+                # Add default turf if needed
+                if not any(obj.startswith("/turf/") for obj in objects_at_pos):
+                    objects_at_pos.insert(0, "/turf/open/floor/plating")
+
+                # Add area
+                objects_at_pos.append("/area/template_noop")
+
+                combination = tuple(objects_at_pos)
                 grid[y][x] = combination_to_letter[combination]
 
         # Build DMM string
@@ -204,9 +257,9 @@ class SS13MapGenerator:
         )
 
         # Write tile definitions - sorted for consistency
-        for letter in sorted(tile_combinations.keys()):
-            objects = tile_combinations[letter]
-            dmm_lines.append(f'"{letter}" = (')
+        for key in sorted(tile_combinations.keys()):
+            objects = tile_combinations[key]
+            dmm_lines.append(f'"{key}" = (')
 
             for i, obj in enumerate(objects):
                 if i == len(objects) - 1:
@@ -216,8 +269,18 @@ class SS13MapGenerator:
 
         # Write grid
         dmm_lines.append(f'(1,1,{z_level}) = {{"')
+
+        # Check if we're using multi-character keys
+        key_length = len(next(iter(combination_to_letter.values())))
+
         for row in grid:
-            dmm_lines.append("".join(row))
+            if key_length == 1:
+                dmm_lines.append("".join(row))
+            else:
+                # For multi-character keys, we need to ensure they're properly spaced
+                # Actually, multi-char keys in DMM are just concatenated without spaces
+                dmm_lines.append("".join(row))
+
         dmm_lines.append('"}')
 
         return "\n".join(dmm_lines)
