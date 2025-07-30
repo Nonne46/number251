@@ -31,13 +31,16 @@ class SS13MapGenerator:
         print(f"Model loaded successfully on {self.device}")
         print(f"Vocabulary size: {self.model.vocab_size}")
         print(f"Layers: {self.model.hparams.layers}")
+        print(f"Timesteps: {self.model.timesteps}")
 
     @torch.no_grad()
     def generate_maps(
-        self, num_maps=1, width=16, height=16, temperature=1.0, show_progress=True
+        self, num_maps=1, width=16, height=16, temperature=1.0, 
+        show_progress=True, method='basic', guidance_steps=5
     ):
         """Generate maps using the diffusion model"""
         print(f"\nGenerating {num_maps} maps of size {width}x{height}...")
+        print(f"Method: {method}, Temperature: {temperature}")
 
         batch_size = min(num_maps, 4)  # Generate in batches of 4
         all_maps = []
@@ -46,21 +49,56 @@ class SS13MapGenerator:
             current_batch_size = min(batch_size, num_maps - batch_start)
 
             # Generate batch
-            maps = self._sample_batch(
-                current_batch_size,
-                width,
-                height,
-                temperature,
-                show_progress=show_progress,
-            )
+            if method == 'guided':
+                maps = self._sample_batch_guided(
+                    current_batch_size, width, height, temperature, 
+                    guidance_steps, show_progress
+                )
+            else:
+                maps = self._sample_batch_basic(
+                    current_batch_size, width, height, temperature, show_progress
+                )
             all_maps.extend(maps)
 
         return all_maps
 
-    def _sample_batch(
+    def _sample_batch_basic(
         self, batch_size, width, height, temperature=1.0, show_progress=True
     ):
-        """Sample a batch of maps using DDPM"""
+        """Sample using the improved basic method from the model"""
+        shape = (batch_size, self.model.hparams.layers, height, width)
+        maps_tensor = self.model.sample(shape, self.device, temperature)
+        
+        # Post-process each map
+        for i in range(batch_size):
+            maps_tensor[i] = self.postprocess_map(maps_tensor[i])
+        
+        # Convert to numpy
+        maps_np = maps_tensor.cpu().numpy()
+        return [maps_np[i] for i in range(batch_size)]
+
+    def _sample_batch_guided(
+        self, batch_size, width, height, temperature=1.0, 
+        guidance_steps=5, show_progress=True
+    ):
+        """Sample using guided method for better quality"""
+        shape = (batch_size, self.model.hparams.layers, height, width)
+        maps_tensor = self.model.sample_with_guidance(
+            shape, self.device, temperature, guidance_steps
+        )
+        
+        # Post-process each map
+        for i in range(batch_size):
+            maps_tensor[i] = self.postprocess_map(maps_tensor[i])
+        
+        # Convert to numpy
+        maps_np = maps_tensor.cpu().numpy()
+        return [maps_np[i] for i in range(batch_size)]
+
+    def _sample_batch_legacy(
+        self, batch_size, width, height, temperature=1.0, show_progress=True
+    ):
+        """Legacy sampling method (kept for compatibility)"""
         layers = self.model.hparams.layers
         timesteps = self.model.timesteps
 
@@ -77,7 +115,7 @@ class SS13MapGenerator:
             reversed(range(timesteps)), desc="Denoising", disable=not show_progress
         )
 
-        # Denoise step by step
+        # Denoise step by step using the old method
         for t in pbar:
             t_batch = torch.full((batch_size,), t, device=self.device)
 
@@ -96,27 +134,115 @@ class SS13MapGenerator:
                 num_samples=1,
             ).reshape(batch_size, layers, height, width)
 
-            # Mix with less noise for next step
-            if t > 0:
-                alpha_t = self.model.alphas_cumprod[t]
-                alpha_prev = self.model.alphas_cumprod[t - 1]
+            # For legacy compatibility, just use the prediction
+            x = x_pred
 
-                # Probability of replacing with predicted vs keeping noisy
-                replace_prob = (alpha_t - alpha_prev) / alpha_t
-                replace_mask = torch.rand_like(x, dtype=torch.float32) < replace_prob
+            # Show progress
+            unique_tokens = len(torch.unique(x))
+            pbar.set_postfix({"t": t, "unique_tokens": unique_tokens})
 
-                x = torch.where(replace_mask, x_pred, x)
-            else:
-                x = x_pred
-
-            pbar.set_postfix({"t": t, "unique_tokens": len(torch.unique(x))})
-
+        # Post-process
         for i in range(batch_size):
             x[i] = self.postprocess_map(x[i])
 
         # Convert to numpy
         maps_np = x.cpu().numpy()
         return [maps_np[i] for i in range(batch_size)]
+
+    @torch.no_grad()
+    def test_reconstruction(self, test_map, noise_level=0.3):
+        """Test if model can reconstruct a given map with some noise"""
+        print(f"\nTesting reconstruction with noise level {noise_level}...")
+        
+        # Convert to tensor if needed
+        if isinstance(test_map, np.ndarray):
+            test_map = torch.tensor(test_map, dtype=torch.long, device=self.device)
+        
+        if test_map.dim() == 3:
+            test_map = test_map.unsqueeze(0)  # Add batch dimension
+        
+        batch_size = test_map.shape[0]
+        
+        # Add noise to the map
+        t = torch.full((batch_size,), int(self.model.timesteps * noise_level), device=self.device)
+        x_noisy, mask = self.model.q_sample(test_map, t)
+        
+        print(f"Masked {mask.float().mean().item():.2%} of tokens")
+        
+        # Try to reconstruct
+        shape = test_map.shape
+        x_reconstructed = self.model.sample(shape, self.device, temperature=0.8)
+        
+        # Calculate similarity
+        correct = (x_reconstructed == test_map).float().mean().item()
+        print(f"Reconstruction accuracy: {correct:.2%}")
+        
+        return x_reconstructed.cpu().numpy()
+
+    def analyze_generation_quality(self, maps, sample_size=None):
+        """Analyze the quality and diversity of generated maps"""
+        if sample_size and len(maps) > sample_size:
+            maps = maps[:sample_size]
+        
+        print(f"\n=== Generation Quality Analysis ===")
+        print(f"Analyzing {len(maps)} maps...")
+        
+        # Convert to tensors for analysis
+        maps_tensor = torch.stack([torch.tensor(m) for m in maps])
+        
+        # Basic statistics
+        total_positions = maps_tensor.shape[0] * maps_tensor.shape[2] * maps_tensor.shape[3]
+        
+        # Layer usage statistics
+        layer_usage = {}
+        for layer in range(maps_tensor.shape[1]):
+            layer_data = maps_tensor[:, layer]
+            non_empty = (layer_data != self.tokenizer.EMPTY_ID).float().mean().item()
+            unique_tokens = len(torch.unique(layer_data))
+            layer_usage[layer] = {
+                'occupancy': non_empty,
+                'unique_tokens': unique_tokens
+            }
+        
+        print("\nLayer Usage:")
+        for layer, stats in layer_usage.items():
+            layer_type = "Turf" if layer == 0 else f"Object {layer}"
+            print(f"  Layer {layer} ({layer_type}): {stats['occupancy']:.1%} occupancy, "
+                  f"{stats['unique_tokens']} unique tokens")
+        
+        # Token frequency analysis
+        all_tokens = maps_tensor.flatten()
+        unique_tokens, counts = torch.unique(all_tokens, return_counts=True)
+        
+        print(f"\nToken Diversity:")
+        print(f"  Total unique tokens used: {len(unique_tokens)}")
+        print(f"  Vocabulary utilization: {len(unique_tokens)}/{self.model.vocab_size} "
+              f"({len(unique_tokens)/self.model.vocab_size:.1%})")
+        
+        # Most common tokens
+        top_indices = torch.argsort(counts, descending=True)[:10]
+        print(f"\nMost common tokens:")
+        for i, idx in enumerate(top_indices):
+            token_id = unique_tokens[idx].item()
+            count = counts[idx].item()
+            token_name = self.tokenizer.id_to_token.get(token_id, f"<UNK:{token_id}>")
+            percentage = count / len(all_tokens) * 100
+            print(f"  {i+1:2d}. {token_name:<30} {count:6d} ({percentage:5.1f}%)")
+        
+        # Map diversity (how similar are maps to each other)
+        if len(maps) > 1:
+            similarities = []
+            for i in range(min(10, len(maps))):
+                for j in range(i+1, min(10, len(maps))):
+                    similarity = (maps_tensor[i] == maps_tensor[j]).float().mean().item()
+                    similarities.append(similarity)
+            
+            avg_similarity = np.mean(similarities)
+            print(f"\nMap Diversity:")
+            print(f"  Average pairwise similarity: {avg_similarity:.1%}")
+            print(f"  Diversity score: {1-avg_similarity:.1%}")
+        
+        return layer_usage, unique_tokens, counts
 
     def tensor_to_dmm(self, tensor_map, map_name="generated", z_level=1):
         """Convert tensor map back to DMM format"""
@@ -386,10 +512,21 @@ def main():
         "--temperature", type=float, default=1.0, help="Sampling temperature"
     )
     parser.add_argument(
+        "--method", type=str, default='basic', choices=['basic', 'guided', 'legacy'],
+        help="Sampling method (basic=improved, guided=high quality, legacy=old method)"
+    )
+    parser.add_argument(
+        "--guidance-steps", type=int, default=5, 
+        help="Number of guidance steps for guided sampling"
+    )
+    parser.add_argument(
         "--output-dir", type=str, default="generated_maps", help="Output directory"
     )
     parser.add_argument(
         "--visualize", action="store_true", help="Visualize generated maps"
+    )
+    parser.add_argument(
+        "--analyze", action="store_true", help="Analyze generation quality"
     )
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
 
@@ -399,6 +536,7 @@ def main():
     if args.seed is not None:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
+        print(f"Set random seed to {args.seed}")
 
     # Initialize generator
     generator = SS13MapGenerator(args.checkpoint, args.tokenizer)
@@ -409,7 +547,13 @@ def main():
         width=args.width,
         height=args.height,
         temperature=args.temperature,
+        method=args.method,
+        guidance_steps=args.guidance_steps
     )
+
+    # Analyze quality if requested
+    if args.analyze:
+        generator.analyze_generation_quality(maps)
 
     # Visualize if requested
     if args.visualize:

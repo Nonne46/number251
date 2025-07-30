@@ -23,13 +23,14 @@ class SinusoidalPositionEmbeddings(nn.Module):
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, time_dim, groups=8):
+    def __init__(self, in_channels, out_channels, time_dim, groups=8, dropout=0.1):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, padding=1)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, padding=1)
-        self.norm1 = nn.GroupNorm(groups, out_channels)
-        self.norm2 = nn.GroupNorm(groups, out_channels)
+        self.norm1 = nn.GroupNorm(min(groups, out_channels), out_channels)
+        self.norm2 = nn.GroupNorm(min(groups, out_channels), out_channels)
         self.act = nn.SiLU()
+        self.dropout = nn.Dropout(dropout)
         self.time_mlp = nn.Linear(time_dim, out_channels)
 
         if in_channels != out_channels:
@@ -41,6 +42,7 @@ class ConvBlock(nn.Module):
         h = self.conv1(x)
         h = self.norm1(h)
         h = self.act(h)
+        h = self.dropout(h)
 
         # Add time embedding
         time_emb = self.time_mlp(self.act(t))
@@ -60,7 +62,7 @@ class AttentionBlock(nn.Module):
         self.dim_head = dim_head
         inner_dim = dim_head * heads
 
-        self.norm = nn.GroupNorm(8, channels)
+        self.norm = nn.GroupNorm(min(8, channels), channels)
         self.to_qkv = nn.Conv2d(channels, inner_dim * 3, 1, bias=False)
         self.to_out = nn.Conv2d(inner_dim, channels, 1)
 
@@ -127,8 +129,9 @@ class SS13MapDiffusion(nn.Module):
         self.vocab_size = vocab_size
         self.layers = layers
 
-        # Token embedding
+        # Token embedding with proper initialization
         self.token_embed = nn.Embedding(vocab_size, base_channels)
+        nn.init.normal_(self.token_embed.weight, std=0.02)
 
         # Initial projection
         self.init_conv = nn.Conv2d(layers * base_channels, base_channels, 3, padding=1)
@@ -141,42 +144,40 @@ class SS13MapDiffusion(nn.Module):
             nn.Linear(time_dim * 4, time_dim),
         )
 
-        # U-Net encoder
-        self.down1 = DownBlock(base_channels, base_channels * 2, time_dim)
+        # U-Net encoder - reduced complexity
+        self.down1 = DownBlock(base_channels, base_channels, time_dim)
         self.down2 = DownBlock(
-            base_channels * 2, base_channels * 4, time_dim, use_attn=True
+            base_channels, base_channels * 2, time_dim, use_attn=True
         )
         self.down3 = DownBlock(
-            base_channels * 4, base_channels * 8, time_dim, use_attn=True
+            base_channels * 2, base_channels * 4, time_dim, use_attn=True
         )
 
         # Bottleneck
-        self.mid_block1 = ConvBlock(base_channels * 8, base_channels * 8, time_dim)
-        self.mid_attn = AttentionBlock(base_channels * 8)
-        self.mid_block2 = ConvBlock(base_channels * 8, base_channels * 8, time_dim)
+        self.mid_block1 = ConvBlock(base_channels * 4, base_channels * 4, time_dim)
+        self.mid_attn = AttentionBlock(base_channels * 4)
+        self.mid_block2 = ConvBlock(base_channels * 4, base_channels * 4, time_dim)
 
         # U-Net decoder
         self.up3 = UpBlock(
-            base_channels * 8,
-            base_channels * 8,
-            base_channels * 4,
-            time_dim,
-            use_attn=True,
-        )
-        self.up2 = UpBlock(
             base_channels * 4,
             base_channels * 4,
             base_channels * 2,
             time_dim,
             use_attn=True,
         )
-        self.up1 = UpBlock(
-            base_channels * 2, base_channels * 2, base_channels, time_dim
+        self.up2 = UpBlock(
+            base_channels * 2, base_channels * 2, base_channels, time_dim, use_attn=True
         )
+        self.up1 = UpBlock(base_channels, base_channels, base_channels, time_dim)
 
         # Output projection
         self.out_norm = nn.GroupNorm(8, base_channels)
         self.out_conv = nn.Conv2d(base_channels, layers * vocab_size, 3, padding=1)
+
+        # Initialize output layer to zero for stable training
+        nn.init.zeros_(self.out_conv.weight)
+        nn.init.zeros_(self.out_conv.bias)
 
     def forward(self, x, t):
         # x shape: (batch, layers, height, width)
@@ -225,77 +226,70 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         vocab_size,
         layers=16,
         base_channels=64,
-        timesteps=1000,
-        learning_rate=1e-4,
+        timesteps=250,  # Reduced timesteps
+        learning_rate=2e-4,
+        mask_prob_min=0.1,
+        mask_prob_max=0.9,
     ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.model = SS13MapDiffusion(vocab_size, layers, base_channels, 512)
+        self.model = SS13MapDiffusion(vocab_size, layers, base_channels, 256)
         self.timesteps = timesteps
         self.vocab_size = vocab_size
+        self.mask_prob_min = mask_prob_min
+        self.mask_prob_max = mask_prob_max
 
-        # Noise schedule (linear for discrete diffusion)
-        self.register_buffer("betas", torch.linspace(1e-4, 0.02, timesteps))
-        self.register_buffer("alphas", 1 - self.betas)
-        self.register_buffer("alphas_cumprod", torch.cumprod(self.alphas, dim=0))
+        # Linear noise schedule for discrete case
+        betas = torch.linspace(mask_prob_min, mask_prob_max, timesteps)
+        self.register_buffer("betas", betas)
 
-    def q_sample(self, x_0, t, noise=None):
-        """Forward diffusion process - corrupt data"""
-        if noise is None:
-            # For discrete diffusion, we randomly replace tokens
-            noise = torch.randint(0, self.vocab_size, x_0.shape, device=x_0.device)
+        # For discrete diffusion, we use mask probabilities directly
+        self.register_buffer("mask_probs", betas)
 
-        # Get alpha values for timestep t
-        alpha_t = self.alphas_cumprod[t][:, None, None, None]
+    def q_sample(self, x_0, t):
+        """Forward diffusion process - mask tokens with probability based on timestep"""
+        batch_size = x_0.shape[0]
 
-        # Probability of keeping original token
-        keep_mask = torch.rand_like(x_0, dtype=torch.float32) < alpha_t
+        # Get mask probability for each sample based on timestep
+        mask_prob = self.mask_probs[t]  # Shape: (batch_size,)
 
-        # Mix original and noise
-        x_t = torch.where(keep_mask, x_0, noise)
+        # Create random mask for each position
+        mask = (
+            torch.rand_like(x_0, dtype=torch.float32) < mask_prob[:, None, None, None]
+        )
 
-        return x_t, noise
+        # Create random replacement tokens
+        noise_tokens = torch.randint(0, self.vocab_size, x_0.shape, device=x_0.device)
+
+        # Apply mask
+        x_t = torch.where(mask, noise_tokens, x_0)
+
+        return x_t, mask
 
     def forward(self, x, t):
         return self.model(x, t)
 
     def training_step(self, batch, batch_idx):
-        # Reshape from dataset format
-        x = batch["tensor_data"]  # (batch, layers, h, w)
+        x = batch["tensor_data"]
         x = torch.tensor(x, dtype=torch.long, device=self.device)
 
-        # Sample timesteps
         batch_size = x.shape[0]
         t = torch.randint(0, self.timesteps, (batch_size,), device=self.device)
 
         # Add noise
-        x_noisy, noise = self.q_sample(x, t)
+        x_noisy, mask = self.q_sample(x, t)
 
-        # Predict noise
+        # Predict original tokens
         logits = self(x_noisy, t)  # (batch, layers, vocab_size, h, w)
 
-        # Calculate loss
-        loss = F.cross_entropy(
-            logits.transpose(2, 1),  # (batch, vocab_size, layers, h, w)
-            x,  # (batch, layers, h, w)
-            reduction="mean",
-        )
+        # Reshape for loss computation
+        logits = logits.permute(0, 1, 3, 4, 2)  # (batch, layers, h, w, vocab_size)
+        logits = logits.reshape(-1, self.vocab_size)
+        targets = x.reshape(-1)
 
-        # class_counts = torch.bincount(x.flatten(), minlength=self.vocab_size)
-        # class_weights = 1.0 / torch.log(
-        #     1.2 + class_counts.float()
-        # )  # Logarithmic weighting
-        # class_weights = class_weights / class_weights.sum() * self.vocab_size
-        #
-        # weight_loss = F.cross_entropy(
-        #     logits.view(-1, self.vocab_size),  # Flatten all dimensions except class
-        #     x.view(-1),  # Flatten target
-        #     weight=class_weights.to(self.device),
-        #     reduction="mean",
-        # )
-        #
-        # loss += weight_loss * 0.3
+        # Calculate loss
+        loss = F.cross_entropy(logits, targets, reduction="mean")
 
         self.log("train_loss", loss, prog_bar=True)
         return loss
@@ -307,66 +301,100 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         batch_size = x.shape[0]
         t = torch.randint(0, self.timesteps, (batch_size,), device=self.device)
 
-        x_noisy, noise = self.q_sample(x, t)
+        x_noisy, mask = self.q_sample(x, t)
         logits = self(x_noisy, t)
 
-        loss = F.cross_entropy(logits.transpose(2, 1), x, reduction="mean")
+        # Reshape for loss computation
+        logits = logits.permute(0, 1, 3, 4, 2)
+        logits = logits.reshape(-1, self.vocab_size)
+        targets = x.reshape(-1)
 
-        # class_counts = torch.bincount(x.flatten(), minlength=self.vocab_size)
-        # class_weights = 1.0 / torch.log(
-        #     1.2 + class_counts.float()
-        # )  # Logarithmic weighting
-        # class_weights = class_weights / class_weights.sum() * self.vocab_size
-        #
-        # weight_loss = F.cross_entropy(
-        #     logits.view(-1, self.vocab_size),  # Flatten all dimensions except class
-        #     x.view(-1),  # Flatten target
-        #     weight=class_weights.to(self.device),
-        #     reduction="mean",
-        # )
-        #
-        # loss += weight_loss * 0.3
+        loss = F.cross_entropy(logits, targets, reduction="mean")
 
         self.log("val_loss", loss, prog_bar=True)
         return loss
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.hparams.learning_rate)
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs)
+        optimizer = AdamW(
+            self.parameters(), lr=self.hparams.learning_rate, weight_decay=0.01
+        )
+        # Reduce learning rate more gradually
+        scheduler = CosineAnnealingLR(
+            optimizer, T_max=self.trainer.max_epochs, eta_min=1e-6
+        )
         return [optimizer], [scheduler]
 
     @torch.no_grad()
-    def sample(self, shape, device):
-        """Generate new maps using DDPM sampling"""
+    def sample(self, shape, device, temperature=1.0):
+        """Generate new maps using iterative demasking"""
         batch_size, layers, h, w = shape
 
-        # Start from pure noise
+        # Start with random tokens
         x = torch.randint(0, self.vocab_size, (batch_size, layers, h, w), device=device)
 
-        # Denoise step by step
+        # Iteratively denoise
         for t in reversed(range(self.timesteps)):
             t_batch = torch.full((batch_size,), t, device=device)
 
-            # Predict denoised tokens
-            logits = self(x, t_batch)
+            # Predict logits
+            logits = self(x, t_batch)  # (batch, layers, vocab_size, h, w)
+
+            # Apply temperature
+            logits = logits / temperature
+
+            # Get probabilities
             probs = F.softmax(logits, dim=2)
 
-            # Sample from distribution
-            x_pred = torch.multinomial(
-                probs.permute(0, 1, 3, 4, 2).reshape(-1, self.vocab_size), num_samples=1
-            ).reshape(batch_size, layers, h, w)
+            # Sample new tokens
+            probs_flat = probs.permute(0, 1, 3, 4, 2).reshape(-1, self.vocab_size)
+            sampled_tokens = torch.multinomial(probs_flat, num_samples=1)
+            sampled_tokens = sampled_tokens.reshape(batch_size, layers, h, w)
 
-            # Mix with less noise for next step
             if t > 0:
-                alpha_t = self.alphas_cumprod[t]
-                alpha_prev = self.alphas_cumprod[t - 1] if t > 0 else torch.tensor(1.0)
+                # Decide which tokens to update based on confidence
+                confidence = torch.max(probs, dim=2)[0]  # (batch, layers, h, w)
 
-                # Probability of replacing with predicted vs keeping noisy
-                replace_prob = (alpha_t - alpha_prev) / alpha_t
-                replace_mask = torch.rand_like(x, dtype=torch.float32) < replace_prob
+                # Update tokens with low confidence
+                update_prob = (
+                    self.mask_probs[t - 1] / self.mask_probs[t] if t > 0 else 1.0
+                )
+                update_mask = torch.rand_like(confidence) < update_prob
 
-                x = torch.where(replace_mask, x_pred, x)
+                x = torch.where(update_mask, sampled_tokens, x)
             else:
-                x = x_pred
+                x = sampled_tokens
+
+        return x
+
+    @torch.no_grad()
+    def sample_with_guidance(self, shape, device, temperature=1.0, guidance_steps=5):
+        """Enhanced sampling with self-guidance"""
+        batch_size, layers, h, w = shape
+
+        # Start with random tokens
+        x = torch.randint(0, self.vocab_size, (batch_size, layers, h, w), device=device)
+
+        for t in reversed(range(self.timesteps)):
+            t_batch = torch.full((batch_size,), t, device=device)
+
+            # Multiple guidance steps at each timestep
+            for _ in range(guidance_steps if t > self.timesteps // 2 else 1):
+                logits = self(x, t_batch)
+                logits = logits / temperature
+                probs = F.softmax(logits, dim=2)
+
+                # Sample with higher confidence
+                probs_flat = probs.permute(0, 1, 3, 4, 2).reshape(-1, self.vocab_size)
+                sampled_tokens = torch.multinomial(probs_flat, num_samples=1)
+                sampled_tokens = sampled_tokens.reshape(batch_size, layers, h, w)
+
+                if t > 0:
+                    # Only update most uncertain positions
+                    confidence = torch.max(probs, dim=2)[0]
+                    uncertainty_threshold = torch.quantile(confidence.flatten(), 0.3)
+                    update_mask = confidence < uncertainty_threshold
+                    x = torch.where(update_mask, sampled_tokens, x)
+                else:
+                    x = sampled_tokens
 
         return x
