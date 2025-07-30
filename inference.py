@@ -1,7 +1,5 @@
 import argparse
-import json
 import string
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
