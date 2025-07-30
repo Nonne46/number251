@@ -231,7 +231,7 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.model = SS13MapDiffusion(vocab_size, layers, base_channels)
+        self.model = SS13MapDiffusion(vocab_size, layers, base_channels, 512)
         self.timesteps = timesteps
         self.vocab_size = vocab_size
 
@@ -275,12 +275,27 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         # Predict noise
         logits = self(x_noisy, t)  # (batch, layers, vocab_size, h, w)
 
+        class_counts = torch.bincount(x.flatten(), minlength=self.vocab_size)
+        class_weights = 1.0 / torch.log(
+            1.2 + class_counts.float()
+        )  # Logarithmic weighting
+        class_weights = class_weights / class_weights.sum() * self.vocab_size
+
         # Calculate loss
         loss = F.cross_entropy(
             logits.transpose(2, 1),  # (batch, vocab_size, layers, h, w)
             x,  # (batch, layers, h, w)
             reduction="mean",
         )
+
+        weight_loss = F.cross_entropy(
+            logits.view(-1, self.vocab_size),  # Flatten all dimensions except class
+            x.view(-1),  # Flatten target
+            weight=class_weights.to(self.device),
+            reduction="mean",
+        )
+
+        loss += weight_loss * 0.3
 
         self.log("train_loss", loss, prog_bar=True)
         return loss
@@ -295,7 +310,22 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         x_noisy, noise = self.q_sample(x, t)
         logits = self(x_noisy, t)
 
+        class_counts = torch.bincount(x.flatten(), minlength=self.vocab_size)
+        class_weights = 1.0 / torch.log(
+            1.2 + class_counts.float()
+        )  # Logarithmic weighting
+        class_weights = class_weights / class_weights.sum() * self.vocab_size
+
         loss = F.cross_entropy(logits.transpose(2, 1), x, reduction="mean")
+
+        weight_loss = F.cross_entropy(
+            logits.view(-1, self.vocab_size),  # Flatten all dimensions except class
+            x.view(-1),  # Flatten target
+            weight=class_weights.to(self.device),
+            reduction="mean",
+        )
+
+        loss += weight_loss * 0.3
 
         self.log("val_loss", loss, prog_bar=True)
         return loss
