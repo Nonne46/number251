@@ -1,0 +1,1852 @@
+//MAP CONVERTED BY dmm2tgm.py THIS HEADER COMMENT PREVENTS RECONVERSION, DO NOT REMOVE
+"aq" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 10
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"aZ" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 5
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"bP" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"dP" = (
+/obj/effect/turf_decal/stripes/full,
+/obj/structure/emergency_shield/barrier,
+/turf/open/floor/plating/is12/surface,
+/area/violence)
+"fc" = (
+/obj/structure/bed/maint,
+/obj/effect/turf_decal/stripes/line{
+	dir = 1
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"ft" = (
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"fx" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 1
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"fM" = (
+/obj/effect/turf_decal/stripes/line,
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"fQ" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 6
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"fV" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/corner,
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"gY" = (
+/obj/effect/turf_decal/box/red/corners{
+	dir = 4
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"hy" = (
+/obj/effect/turf_decal/stripes/full,
+/obj/structure/emergency_shield/barrier,
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"ic" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"iB" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 10
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"jO" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"lw" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/obj/structure/deployable_barricade/sandbags,
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"nh" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/corner{
+	dir = 4
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"oj" = (
+/obj/structure/bed/maint,
+/obj/effect/turf_decal/stripes/line,
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"oF" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/corner{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"pJ" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line,
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"qH" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/structure/flippedtable{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"rk" = (
+/obj/effect/landmark/start/combatant/blue,
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"sl" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 9
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"sN" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 6
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"tu" = (
+/obj/structure/closet{
+	anchored = 1
+	},
+/obj/effect/turf_decal/box,
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"vy" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "m4"
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"vR" = (
+/obj/structure/deployable_barricade/sandbags{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"wJ" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"xw" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/obj/structure/deployable_barricade/sandbags{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"yi" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/machinery/door/airlock/grunge,
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"ze" = (
+/obj/effect/landmark/bomb_plant_location,
+/obj/effect/turf_decal/box/red,
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"AJ" = (
+/obj/effect/turf_decal/box/red/corners{
+	dir = 1
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"AK" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "m3"
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"AT" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"BW" = (
+/obj/effect/turf_decal/box/red/corners{
+	dir = 8
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"CM" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/full,
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"Fq" = (
+/obj/effect/turf_decal/stripes/full,
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"FX" = (
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"Gp" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"HM" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 5
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"HN" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/corner{
+	dir = 8
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"Iu" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "m1"
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"IR" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"Jz" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 9
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"JX" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/landmark/observer_start,
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"KS" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "m3"
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"LW" = (
+/obj/effect/turf_decal/is12,
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"Ms" = (
+/obj/effect/turf_decal/box/red/corners,
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"MO" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"Ns" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/structure/flippedtable{
+	dir = 1
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"NV" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "m2"
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"NZ" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"OU" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 5
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"Qg" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "grass"
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"QE" = (
+/obj/structure/deployable_barricade/sandbags,
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"QN" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "m4"
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"QR" = (
+/obj/effect/baseturf_helper/dune,
+/turf/closed/indestructible/riveted/dirtystone,
+/area/violence)
+"Rh" = (
+/obj/effect/turf_decal/stripes/line,
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"Rm" = (
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"Rw" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/closed/indestructible/riveted/dirtystone,
+/area/violence)
+"RI" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/structure/flippedtable,
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"Sa" = (
+/turf/template_noop,
+/area/template_noop)
+"Tc" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"TX" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"Ue" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 6
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"UH" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 8
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"Vc" = (
+/obj/effect/turf_decal/stripes/full,
+/obj/structure/emergency_shield/barrier,
+/turf/open/indestructible/boss/air,
+/area/violence)
+"Vt" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/structure/flippedtable,
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"VV" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 9
+	},
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"Wa" = (
+/obj/effect/landmark/start/combatant/red,
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"WG" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"XO" = (
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/obj/effect/turf_decal/stripes/line{
+	dir = 4
+	},
+/turf/open/floor/plating/is12/trenchcenter,
+/area/violence)
+"YA" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 10
+	},
+/turf/open/floor/plating/is12/wwidirt,
+/area/violence)
+"YT" = (
+/obj/effect/turf_decal/stripes/line,
+/obj/effect/decal/cleanable/dirt,
+/turf/open/floor/plating/is12/wood,
+/area/violence)
+"YX" = (
+/obj/effect/turf_decal/stripes/full,
+/turf/open/floor/plating/is12/surface,
+/area/violence)
+"Zg" = (
+/obj/effect/turf_decal/stripes/line{
+	dir = 1
+	},
+/obj/effect/turf_decal/is12{
+	icon_state = "wwi"
+	},
+/turf/open/floor/plating/is12/rock,
+/area/violence)
+"ZD" = (
+/turf/closed/indestructible/riveted/dirtystone,
+/area/violence)
+
+(1,1,1) = {"
+Sa
+Sa
+QR
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+Sa
+Sa
+"}
+(2,1,1) = {"
+Sa
+Sa
+ZD
+Jz
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+ZD
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+YA
+ZD
+Sa
+Sa
+"}
+(3,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+ZD
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+vR
+FX
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(4,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+ZD
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+vR
+FX
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(5,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+QN
+AK
+FX
+FX
+ZD
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+vR
+FX
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(6,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+Qg
+FX
+NV
+Iu
+FX
+FX
+ZD
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+Qg
+vR
+FX
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(7,1,1) = {"
+Sa
+Sa
+ZD
+OU
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ZD
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+sN
+ZD
+Sa
+Sa
+"}
+(8,1,1) = {"
+Sa
+Sa
+ZD
+ZD
+dP
+dP
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+YX
+YX
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+dP
+dP
+ZD
+ZD
+Sa
+Sa
+"}
+(9,1,1) = {"
+Sa
+ZD
+ZD
+ZD
+Vc
+Vc
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+Fq
+Fq
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+Vc
+Vc
+ZD
+ZD
+ZD
+Sa
+"}
+(10,1,1) = {"
+Sa
+ZD
+VV
+UH
+UH
+UH
+aq
+ZD
+sl
+Tc
+RI
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Tc
+Ns
+Tc
+iB
+ZD
+VV
+UH
+UH
+UH
+aq
+ZD
+Sa
+"}
+(11,1,1) = {"
+Sa
+ZD
+fc
+Wa
+ft
+Wa
+YT
+ZD
+Zg
+fV
+WG
+WG
+WG
+WG
+WG
+WG
+WG
+WG
+WG
+WG
+WG
+xw
+WG
+WG
+WG
+WG
+WG
+WG
+LW
+WG
+nh
+Rh
+ZD
+fx
+rk
+ft
+rk
+oj
+ZD
+Sa
+"}
+(12,1,1) = {"
+Sa
+ZD
+fx
+Rm
+Rm
+Rm
+YT
+ZD
+Zg
+pJ
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+CM
+CM
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+jO
+Rh
+ZD
+fx
+Rm
+Rm
+Rm
+YT
+ZD
+Sa
+"}
+(13,1,1) = {"
+Sa
+ZD
+fx
+Rm
+Rm
+ft
+YT
+ZD
+Zg
+pJ
+Rw
+Gp
+Gp
+Gp
+Gp
+Gp
+Gp
+Gp
+Rw
+Gp
+Gp
+Rw
+Gp
+Gp
+Gp
+Gp
+Gp
+Gp
+Gp
+Rw
+jO
+Rh
+ZD
+IR
+Rm
+Rm
+ft
+YT
+ZD
+Sa
+"}
+(14,1,1) = {"
+Sa
+ZD
+fx
+Wa
+Rm
+Wa
+YT
+ZD
+Zg
+pJ
+yi
+AT
+AT
+AT
+tu
+AT
+AT
+AT
+Rw
+AT
+AT
+Rw
+AT
+AT
+AT
+tu
+AT
+AT
+AT
+yi
+jO
+Rh
+ZD
+fx
+rk
+ft
+rk
+YT
+ZD
+Sa
+"}
+(15,1,1) = {"
+Sa
+ZD
+fx
+ft
+Rm
+ft
+YT
+hy
+Zg
+pJ
+Rw
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+Ms
+AT
+gY
+AT
+AT
+AT
+AT
+Rw
+jO
+Rh
+hy
+fx
+Rm
+ft
+ft
+YT
+ZD
+Sa
+"}
+(16,1,1) = {"
+Sa
+ZD
+fc
+Rm
+Rm
+Rm
+YT
+hy
+Zg
+pJ
+Rw
+AT
+tu
+AT
+tu
+AT
+AT
+AT
+AT
+JX
+AT
+AT
+AT
+ze
+AT
+tu
+AT
+tu
+AT
+Rw
+jO
+Rh
+hy
+fx
+Rm
+Rm
+Rm
+oj
+ZD
+Sa
+"}
+(17,1,1) = {"
+Sa
+ZD
+fx
+ft
+ft
+ft
+YT
+hy
+Zg
+pJ
+Rw
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+AT
+BW
+AT
+AJ
+AT
+AT
+AT
+AT
+Rw
+jO
+Rh
+hy
+fx
+Rm
+Rm
+ft
+YT
+ZD
+Sa
+"}
+(18,1,1) = {"
+Sa
+ZD
+fx
+Wa
+Rm
+Wa
+YT
+ZD
+Zg
+pJ
+yi
+AT
+AT
+AT
+tu
+AT
+AT
+AT
+Rw
+AT
+AT
+Rw
+AT
+AT
+AT
+tu
+AT
+AT
+AT
+yi
+jO
+Rh
+ZD
+fx
+rk
+Rm
+rk
+YT
+ZD
+Sa
+"}
+(19,1,1) = {"
+Sa
+ZD
+fx
+Rm
+Rm
+ft
+YT
+ZD
+Zg
+pJ
+Rw
+XO
+XO
+XO
+XO
+XO
+XO
+XO
+Rw
+XO
+XO
+Rw
+XO
+XO
+XO
+XO
+XO
+XO
+XO
+Rw
+jO
+Rh
+ZD
+fx
+Rm
+Rm
+Rm
+YT
+ZD
+Sa
+"}
+(20,1,1) = {"
+Sa
+ZD
+fx
+Rm
+Rm
+Rm
+YT
+ZD
+Zg
+pJ
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+CM
+CM
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+Rw
+jO
+Rh
+ZD
+fx
+Rm
+Rm
+Rm
+YT
+ZD
+Sa
+"}
+(21,1,1) = {"
+Sa
+ZD
+fc
+Wa
+Rm
+Wa
+YT
+ZD
+Zg
+HN
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+lw
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+NZ
+oF
+Rh
+ZD
+fx
+rk
+ft
+rk
+oj
+ZD
+Sa
+"}
+(22,1,1) = {"
+Sa
+ZD
+HM
+TX
+TX
+TX
+fQ
+ZD
+aZ
+bP
+Vt
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+bP
+qH
+bP
+Ue
+ZD
+HM
+TX
+TX
+TX
+fQ
+ZD
+Sa
+"}
+(23,1,1) = {"
+Sa
+ZD
+ZD
+ZD
+Vc
+Vc
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+Fq
+Fq
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+Vc
+Vc
+ZD
+ZD
+ZD
+Sa
+"}
+(24,1,1) = {"
+Sa
+Sa
+ZD
+ZD
+dP
+dP
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+YX
+YX
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+dP
+dP
+ZD
+ZD
+Sa
+Sa
+"}
+(25,1,1) = {"
+Sa
+Sa
+ZD
+Jz
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+ZD
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+wJ
+vy
+KS
+wJ
+wJ
+wJ
+wJ
+YA
+ZD
+Sa
+Sa
+"}
+(26,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+Qg
+FX
+FX
+vR
+FX
+FX
+ZD
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+vR
+Iu
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(27,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+vR
+FX
+FX
+ZD
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+vR
+FX
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(28,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+ZD
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+vR
+FX
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(29,1,1) = {"
+Sa
+Sa
+ZD
+MO
+FX
+FX
+FX
+FX
+FX
+QE
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+ZD
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+FX
+Qg
+vR
+FX
+FX
+FX
+FX
+FX
+fM
+ZD
+Sa
+Sa
+"}
+(30,1,1) = {"
+Sa
+Sa
+ZD
+OU
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ZD
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+ic
+sN
+ZD
+Sa
+Sa
+"}
+(31,1,1) = {"
+Sa
+Sa
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+ZD
+Sa
+Sa
+"}

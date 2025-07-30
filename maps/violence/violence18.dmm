@@ -1,0 +1,602 @@
+//MAP CONVERTED BY dmm2tgm.py THIS HEADER COMMENT PREVENTS RECONVERSION, DO NOT REMOVE
+"a" = (
+/obj/structure/flora/desert/cactus,
+/turf/open/floor/dune/sandstone,
+/area/violence)
+"c" = (
+/turf/open/floor/dune/desert,
+/area/violence)
+"d" = (
+/obj/effect/baseturf_helper/dune,
+/turf/closed/indestructible/sandstone,
+/area/violence)
+"g" = (
+/turf/open/floor/dune/sandstone,
+/area/violence)
+"h" = (
+/obj/structure/deployable_barricade/sandbags,
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"i" = (
+/obj/effect/landmark/start/combatant/blue,
+/turf/open/floor/dune/desert,
+/area/violence)
+"j" = (
+/obj/structure/deployable_barricade/sandbags{
+	dir = 1
+	},
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"k" = (
+/turf/open/floor/dune,
+/area/violence)
+"l" = (
+/obj/effect/turf_decal/box/red/corners{
+	dir = 8
+	},
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"n" = (
+/obj/effect/decal/cleanable/plasma,
+/turf/open/floor/dune/desert,
+/area/violence)
+"o" = (
+/turf/open/floor/dune/grass,
+/area/violence)
+"r" = (
+/obj/effect/decal/cleanable/plasma,
+/turf/open/floor/dune,
+/area/violence)
+"s" = (
+/obj/effect/turf_decal/box/red/corners,
+/obj/effect/powerup/grenade,
+/turf/open/floor/dune,
+/area/violence)
+"u" = (
+/obj/structure/deployable_barricade/sandbags,
+/turf/open/floor/dune/sandstone,
+/area/violence)
+"v" = (
+/obj/effect/decal/cleanable/plastic,
+/turf/open/floor/dune/desert,
+/area/violence)
+"x" = (
+/obj/effect/decal/cleanable/leaper_sludge,
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"y" = (
+/turf/closed/indestructible/sandstone,
+/area/violence)
+"z" = (
+/obj/structure/emergency_shield/barrier,
+/turf/open/floor/dune,
+/area/violence)
+"A" = (
+/obj/structure/emergency_shield/barrier,
+/turf/open/floor/dune/desert,
+/area/violence)
+"B" = (
+/obj/structure/flora/desert/large_cactus,
+/turf/open/floor/dune,
+/area/violence)
+"C" = (
+/obj/structure/flora/desert/cactus,
+/turf/open/floor/dune,
+/area/violence)
+"D" = (
+/obj/effect/landmark/bomb_plant_location,
+/obj/effect/turf_decal/box/red,
+/turf/open/floor/dune,
+/area/violence)
+"E" = (
+/obj/effect/powerup/grenade,
+/turf/open/floor/dune,
+/area/violence)
+"I" = (
+/obj/structure/flora/desert/large_cactus,
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"J" = (
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"K" = (
+/obj/structure/flora/desert/plant,
+/turf/open/floor/dune,
+/area/violence)
+"N" = (
+/obj/effect/landmark/start/combatant/red,
+/turf/open/floor/dune/desert,
+/area/violence)
+"P" = (
+/obj/structure/deployable_barricade/sandbags{
+	dir = 1
+	},
+/turf/open/floor/dune/sandstone,
+/area/violence)
+"Q" = (
+/obj/effect/powerup/grenade,
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"U" = (
+/obj/effect/decal/cleanable/leaper_sludge,
+/turf/open/floor/dune,
+/area/violence)
+"W" = (
+/obj/effect/decal/cleanable/shreds,
+/turf/open/floor/dune,
+/area/violence)
+"X" = (
+/obj/structure/deployable_barricade/sandbags{
+	dir = 1
+	},
+/turf/open/floor/dune,
+/area/violence)
+"Y" = (
+/obj/structure/emergency_shield/barrier,
+/turf/open/floor/dune/scorched_sand,
+/area/violence)
+"Z" = (
+/obj/structure/deployable_barricade/sandbags,
+/turf/open/floor/dune,
+/area/violence)
+
+(1,1,1) = {"
+d
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+"}
+(2,1,1) = {"
+y
+N
+c
+c
+Y
+J
+J
+g
+g
+g
+J
+g
+g
+g
+J
+J
+Y
+c
+c
+i
+y
+"}
+(3,1,1) = {"
+y
+N
+c
+v
+y
+J
+J
+u
+g
+g
+J
+g
+g
+P
+J
+J
+y
+c
+c
+i
+y
+"}
+(4,1,1) = {"
+y
+N
+c
+k
+y
+J
+J
+h
+J
+g
+k
+k
+J
+j
+J
+J
+y
+J
+c
+i
+y
+"}
+(5,1,1) = {"
+y
+N
+c
+k
+z
+J
+J
+y
+J
+a
+k
+k
+J
+y
+J
+x
+z
+k
+c
+i
+y
+"}
+(6,1,1) = {"
+y
+c
+y
+y
+y
+y
+Q
+y
+J
+g
+k
+k
+k
+y
+E
+y
+y
+y
+y
+c
+y
+"}
+(7,1,1) = {"
+y
+N
+c
+z
+C
+k
+k
+J
+J
+k
+c
+k
+k
+J
+k
+k
+B
+z
+J
+i
+y
+"}
+(8,1,1) = {"
+y
+N
+c
+z
+k
+k
+k
+J
+g
+y
+k
+y
+J
+r
+k
+k
+o
+z
+J
+i
+y
+"}
+(9,1,1) = {"
+y
+N
+c
+y
+k
+k
+K
+J
+g
+y
+c
+y
+J
+k
+J
+o
+o
+y
+k
+i
+y
+"}
+(10,1,1) = {"
+y
+N
+c
+y
+k
+k
+k
+J
+g
+j
+c
+Z
+J
+J
+J
+o
+o
+y
+k
+i
+y
+"}
+(11,1,1) = {"
+y
+N
+c
+y
+k
+W
+J
+J
+J
+X
+c
+h
+g
+J
+W
+o
+o
+y
+k
+i
+y
+"}
+(12,1,1) = {"
+y
+N
+c
+y
+k
+k
+k
+J
+J
+y
+c
+y
+g
+J
+K
+o
+o
+y
+J
+i
+y
+"}
+(13,1,1) = {"
+y
+N
+c
+A
+k
+J
+k
+k
+J
+y
+c
+y
+g
+J
+k
+k
+k
+z
+c
+i
+y
+"}
+(14,1,1) = {"
+y
+N
+c
+A
+I
+k
+U
+k
+J
+J
+J
+c
+c
+J
+k
+k
+C
+z
+k
+i
+y
+"}
+(15,1,1) = {"
+y
+c
+y
+y
+y
+y
+E
+y
+J
+k
+J
+c
+c
+y
+s
+y
+y
+y
+y
+c
+y
+"}
+(16,1,1) = {"
+y
+N
+c
+c
+z
+o
+k
+y
+J
+k
+J
+a
+J
+y
+J
+D
+z
+k
+c
+i
+y
+"}
+(17,1,1) = {"
+y
+N
+c
+c
+y
+o
+J
+h
+J
+k
+J
+J
+J
+P
+l
+J
+y
+c
+c
+i
+y
+"}
+(18,1,1) = {"
+y
+N
+c
+n
+y
+J
+J
+h
+J
+k
+J
+g
+J
+j
+J
+J
+y
+c
+v
+i
+y
+"}
+(19,1,1) = {"
+y
+N
+c
+c
+Y
+J
+J
+J
+J
+J
+J
+J
+J
+g
+J
+J
+Y
+c
+c
+i
+y
+"}
+(20,1,1) = {"
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+y
+"}
