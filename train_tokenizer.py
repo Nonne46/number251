@@ -24,51 +24,10 @@ class SS13TokenizerTrainer:
     def extract_objects_from_map(self, map_content: str) -> Set[str]:
         """Extract all unique objects from a single map file"""
         objects = set()
-        lines = map_content.strip().split("\n")
+        tile_definitions = self.parse_tile_definitions(map_content)
 
-        current_tile = None
-        in_definition = False
-
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-
-            # Check for tile definition start
-            tile_match = re.match(r'"([a-zA-Z])" = \(', line)
-            if tile_match:
-                current_tile = tile_match.group(1)
-                in_definition = True
-                i += 1
-                continue
-
-            # Parse objects within definition
-            if in_definition and current_tile:
-                if line.startswith("/"):
-                    obj_line = line.rstrip(",").strip()
-                    # Handle objects with parameters
-                    if "{" in obj_line:
-                        if "}" not in obj_line:
-                            # Multi-line object definition
-                            base_obj = obj_line.split("{")[0]
-                            objects.add(base_obj)
-                            # Skip parameter lines
-                            i += 1
-                            while i < len(lines) and "}" not in lines[i]:
-                                i += 1
-                            i += 1
-                            continue
-                        else:
-                            # Single line with parameters
-                            base_obj = obj_line.split("{")[0]
-                            objects.add(base_obj)
-                    else:
-                        # Simple object
-                        objects.add(obj_line)
-                elif line == ")":
-                    in_definition = False
-                    current_tile = None
-
-            i += 1
+        for tile_objects in tile_definitions.values():
+            objects.update(tile_objects)
 
         return objects
 
@@ -91,28 +50,47 @@ class SS13TokenizerTrainer:
         else:
             return "other"
 
+    def _detect_tile_id_length(self, map_content: str) -> int:
+        """Detect tile identifier length by finding the first tile definition"""
+        # Look for the first tile definition pattern
+        match = re.search(r'"([^"]+)"\s*=\s*\(', map_content)
+        if match:
+            return len(match.group(1))
+        return 1  # fallback
+
     def count_tile_occurrences(self, map_content: str) -> Dict[str, int]:
         """Count how many times each tile type appears in the map grid"""
         tile_counts = Counter()
+
+        # Detect tile ID length first
+        tile_length = self._detect_tile_id_length(map_content)
+
         lines = map_content.strip().split("\n")
 
         # Find grid definitions
         i = 0
         while i < len(lines):
             line = lines[i].strip()
-            grid_match = re.match(r'\((\d+),(\d+),(\d+)\) = \{"', line)
-            if grid_match:
+            if re.match(r'\((\d+),(\d+),(\d+)\) = \{"', line):
                 # Extract grid content
                 i += 1
+                grid_content = ""
                 while i < len(lines):
                     grid_line = lines[i].strip()
                     if grid_line == '"}':
                         break
                     if grid_line and not grid_line.startswith("("):
-                        for char in grid_line:
-                            if char.isalpha():
-                                tile_counts[char] += 1
+                        # Remove quotes and add to content
+                        clean_line = grid_line.strip('"')
+                        grid_content += clean_line
                     i += 1
+
+                # Count tiles based on detected length
+                for j in range(0, len(grid_content), tile_length):
+                    if j + tile_length <= len(grid_content):
+                        tile_id = grid_content[j : j + tile_length]
+                        if tile_id.strip():  # Only count non-empty tiles
+                            tile_counts[tile_id] += 1
             i += 1
 
         return dict(tile_counts)
@@ -143,10 +121,30 @@ class SS13TokenizerTrainer:
                 # Parse tile definitions to map tiles to objects
                 tile_to_objects = self.parse_tile_definitions(content)
 
+                # Debug info for first few maps
+                if self.total_maps < 3:
+                    print(f"\nDebugging map: {map_file.name}")
+                    print(f"Tile definitions found: {len(tile_to_objects)}")
+                    print(f"Tile usage counts: {len(tile_counts)}")
+
+                    # Show tile ID length
+                    if tile_to_objects:
+                        first_tile = next(iter(tile_to_objects.keys()))
+                        print(f"Tile ID length: {len(first_tile)}")
+
+                    # Show some tile definitions
+                    for tile, objects in list(tile_to_objects.items())[:3]:
+                        usage_count = tile_counts.get(tile, 0)
+                        print(f"  Tile '{tile}' (used {usage_count} times): {objects}")
+
                 # Count objects weighted by their tile usage
                 for tile_char, count in tile_counts.items():
                     if tile_char in tile_to_objects:
                         for obj in tile_to_objects[tile_char]:
+                            # if "/area" in obj:
+                            #     continue
+                            # if "/obj/effect" in obj:
+                            #     continue
                             self.object_counts[obj] += count
                             self.object_categories[self.categorize_object(obj)].append(
                                 obj
@@ -165,54 +163,87 @@ class SS13TokenizerTrainer:
                 continue
 
     def parse_tile_definitions(self, map_content: str) -> Dict[str, List[str]]:
-        """Parse tile definitions to map tile characters to object lists"""
+        """Parse tile definitions to map tile characters to object lists - fast but thorough approach"""
         tile_definitions = {}
-        lines = map_content.strip().split("\n")
 
-        current_tile = None
-        in_definition = False
+        # Split into sections for faster processing
+        # Find all tile definition blocks using a simple approach
+        sections = re.split(r'\n(?="[^"]+"\s*=\s*\()', map_content)
 
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-
-            # Check for tile definition start
-            tile_match = re.match(r'"([a-zA-Z])" = \(', line)
-            if tile_match:
-                current_tile = tile_match.group(1)
-                tile_definitions[current_tile] = []
-                in_definition = True
-                i += 1
+        for section in sections:
+            if not section.strip():
                 continue
 
-            # Parse objects within definition
-            if in_definition and current_tile:
-                if line.startswith("/"):
-                    obj_line = line.rstrip(",").strip()
-                    # Handle objects with parameters
-                    if "{" in obj_line:
-                        if "}" not in obj_line:
-                            # Multi-line object definition
-                            base_obj = obj_line.split("{")[0]
-                            tile_definitions[current_tile].append(base_obj)
-                            # Skip parameter lines
-                            i += 1
-                            while i < len(lines) and "}" not in lines[i]:
-                                i += 1
-                            i += 1
-                            continue
-                        else:
-                            # Single line with parameters
-                            base_obj = obj_line.split("{")[0]
-                            tile_definitions[current_tile].append(base_obj)
-                    else:
-                        # Simple object
-                        tile_definitions[current_tile].append(obj_line)
-                elif line == ")":
-                    in_definition = False
-                    current_tile = None
+            lines = section.strip().split("\n")
+            if not lines:
+                continue
 
-            i += 1
+            # Check if this section starts with a tile definition
+            first_line = lines[0].strip()
+            tile_match = re.match(r'"([^"]+)"\s*=\s*\(', first_line)
+            if not tile_match:
+                continue
+
+            tile_id = tile_match.group(1)
+            objects = []
+
+            # Process all lines in this section
+            in_param_block = False
+            brace_depth = 0
+
+            for line in lines[1:]:  # Skip first line (tile definition)
+                line = line.strip()
+
+                # Skip empty lines and comments
+                if not line or line.startswith("//"):
+                    continue
+
+                # Check for end of tile definition
+                if line == ")":
+                    break
+
+                # Handle object lines
+                if line.startswith("/"):
+                    # Clean the line
+                    obj_line = line.rstrip(",").strip()
+
+                    # Check if this line ends the definition
+                    ends_with_paren = obj_line.endswith(")")
+                    if ends_with_paren:
+                        obj_line = obj_line.rstrip(")")
+
+                    # Handle parameter blocks
+                    if "{" in obj_line:
+                        base_obj = obj_line.split("{")[0].strip()
+                        if base_obj:
+                            objects.append(base_obj)
+
+                        # Track brace depth for multi-line parameters
+                        brace_depth += obj_line.count("{") - obj_line.count("}")
+                        in_param_block = brace_depth > 0
+
+                    elif not in_param_block:
+                        # Simple object without parameters
+                        if obj_line:
+                            objects.append(obj_line)
+
+                    # End definition if we found closing paren
+                    if ends_with_paren:
+                        break
+
+                elif in_param_block:
+                    # We're inside a parameter block, track braces
+                    brace_depth += line.count("{") - line.count("}")
+                    if brace_depth <= 0:
+                        in_param_block = False
+                        brace_depth = 0
+
+                        # Check if parameter block line ends definition
+                        if line.endswith("})"):
+                            break
+
+            if objects:
+                tile_definitions[tile_id] = objects
 
         return tile_definitions
 

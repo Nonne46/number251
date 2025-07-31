@@ -153,10 +153,6 @@ def main():
     print(f"Train samples: {len(train_dataset)}")
     print(f"Validation samples: {len(val_dataset)}")
 
-    # Print some dataset statistics
-    unique_maps = len(set(item["map_name"] for item in train_dataset))
-    print(f"Unique maps in training set: {unique_maps}")
-
     # Create PyTorch datasets
     train_pytorch_dataset = SS13MapDataset(train_dataset)
     val_pytorch_dataset = SS13MapDataset(val_dataset)

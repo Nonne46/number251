@@ -1,5 +1,6 @@
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -45,85 +46,136 @@ class SS13MapTokenizer:
         self.area_pattern = re.compile(r"^/area/")
 
     def get_object_layer(self, obj_path: str, used_layers: set) -> Optional[int]:
-        """
-        Determine which layer an object should go in
-
-        Args:
-            obj_path: Object path like '/turf/open/floor/plating'
-            used_layers: Set of layers already used for this tile
-
-        Returns:
-            Layer index or None if no space available
-        """
-        # Layer 0 is reserved for turfs only
-        if self.turf_pattern.match(obj_path):
-            return 0 if 0 not in used_layers else None
-
         # Areas always go on the last layer (reserved, never dropped)
         if self.area_pattern.match(obj_path):
             return self.max_layers - 1
 
-        # Everything else goes in layers 1 to (max_layers-2) (first available)
-        for layer in range(1, self.max_layers - 1):
+        for layer in range(0, self.max_layers - 1):
             if layer not in used_layers:
                 return layer
 
         # No space available - will be dropped
         return None
 
-    def parse_dmm_map(self, map_string: str) -> Dict:
-        """Parse DMM format map string"""
-        lines = map_string.strip().split("\n")
-        tile_definitions = {}
-        map_grid = []
+    def _detect_tile_id_length(self, map_content: str) -> int:
+        """Detect the length of tile IDs used in this map"""
+        # Look for tile definitions to determine ID length
+        tile_def_match = re.search(r'"([^"]+)"\s*=\s*\(', map_content)
+        if tile_def_match:
+            return len(tile_def_match.group(1))
+        return 1  # Default fallback
 
-        # Parse tile definitions
-        current_tile = None
-        in_definition = False
+    def count_tile_occurrences(self, map_content: str) -> Dict[str, int]:
+        """Count how many times each tile type appears in the map grid"""
+        tile_counts = Counter()
+        # Detect tile ID length first
+        tile_length = self._detect_tile_id_length(map_content)
+        lines = map_content.strip().split("\n")
+        # Find grid definitions
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if re.match(r'\((\d+),(\d+),(\d+)\) = \{"', line):
+                # Extract grid content
+                i += 1
+                grid_content = ""
+                while i < len(lines):
+                    grid_line = lines[i].strip()
+                    if grid_line == '"}':
+                        break
+                    if grid_line and not grid_line.startswith("("):
+                        # Remove quotes and add to content
+                        clean_line = grid_line.strip('"')
+                        grid_content += clean_line
+                    i += 1
+                # Count tiles based on detected length
+                for j in range(0, len(grid_content), tile_length):
+                    if j + tile_length <= len(grid_content):
+                        tile_id = grid_content[j : j + tile_length]
+                        if tile_id.strip():  # Only count non-empty tiles
+                            tile_counts[tile_id] += 1
+            i += 1
+        return dict(tile_counts)
+
+    def parse_tile_definitions(self, map_content: str) -> Dict[str, List[str]]:
+        """Parse tile definitions to map tile characters to object lists - fast but thorough approach"""
+        tile_definitions = {}
+        # Split into sections for faster processing
+        # Find all tile definition blocks using a simple approach
+        sections = re.split(r'\n(?="[^"]+"\s*=\s*\()', map_content)
+        for section in sections:
+            if not section.strip():
+                continue
+            lines = section.strip().split("\n")
+            if not lines:
+                continue
+            # Check if this section starts with a tile definition
+            first_line = lines[0].strip()
+            tile_match = re.match(r'"([^"]+)"\s*=\s*\(', first_line)
+            if not tile_match:
+                continue
+            tile_id = tile_match.group(1)
+            objects = []
+            # Process all lines in this section
+            in_param_block = False
+            brace_depth = 0
+            for line in lines[1:]:  # Skip first line (tile definition)
+                line = line.strip()
+                # Skip empty lines and comments
+                if not line or line.startswith("//"):
+                    continue
+                # Check for end of tile definition
+                if line == ")":
+                    break
+                # Handle object lines
+                if line.startswith("/"):
+                    # Clean the line
+                    obj_line = line.rstrip(",").strip()
+                    # Check if this line ends the definition
+                    ends_with_paren = obj_line.endswith(")")
+                    if ends_with_paren:
+                        obj_line = obj_line.rstrip(")")
+                    # Handle parameter blocks
+                    if "{" in obj_line:
+                        base_obj = obj_line.split("{")[0].strip()
+                        if base_obj:
+                            objects.append(base_obj)
+                        # Track brace depth for multi-line parameters
+                        brace_depth += obj_line.count("{") - obj_line.count("}")
+                        in_param_block = brace_depth > 0
+                    elif not in_param_block:
+                        # Simple object without parameters
+                        if obj_line:
+                            objects.append(obj_line)
+                    # End definition if we found closing paren
+                    if ends_with_paren:
+                        break
+                elif in_param_block:
+                    # We're inside a parameter block, track braces
+                    brace_depth += line.count("{") - line.count("}")
+                    if brace_depth <= 0:
+                        in_param_block = False
+                        brace_depth = 0
+                        # Check if parameter block line ends definition
+                        if line.endswith("})"):
+                            break
+            if objects:
+                tile_definitions[tile_id] = objects
+        return tile_definitions
+
+    def parse_map_grid(self, map_content: str) -> List[List[str]]:
+        """Parse the map grid from DMM content"""
+        tile_length = self._detect_tile_id_length(map_content)
+        lines = map_content.strip().split("\n")
+        map_grid = []
 
         i = 0
         while i < len(lines):
             line = lines[i].strip()
-
-            # Check for tile definition start
-            tile_match = re.match(r'"([a-zA-Z])" = \(', line)
-            if tile_match:
-                current_tile = tile_match.group(1)
-                tile_definitions[current_tile] = []
-                in_definition = True
-                i += 1
-                continue
-
-            # Parse objects within definition
-            if in_definition and current_tile:
-                if line.startswith("/"):
-                    obj_line = line.rstrip(",").strip()
-                    # Handle objects with parameters
-                    if "{" in obj_line:
-                        if "}" not in obj_line:
-                            # Multi-line object - skip parameters
-                            base_obj = obj_line.split("{")[0]
-                            tile_definitions[current_tile].append(base_obj)
-                            i += 1
-                            while i < len(lines) and "}" not in lines[i]:
-                                i += 1
-                            i += 1
-                            continue
-                        else:
-                            # Single line with parameters
-                            base_obj = obj_line.split("{")[0]
-                            tile_definitions[current_tile].append(base_obj)
-                    else:
-                        tile_definitions[current_tile].append(obj_line)
-                elif line == ")":
-                    in_definition = False
-                    current_tile = None
-
-            # Parse map grid
             grid_match = re.match(r'\((\d+),(\d+),(\d+)\) = \{"', line)
             if grid_match:
                 x_coord = int(grid_match.group(1))
-                grid_content = []
+                grid_content = ""
 
                 i += 1
                 while i < len(lines):
@@ -131,15 +183,23 @@ class SS13MapTokenizer:
                     if grid_line == '"}':
                         break
                     if grid_line and not grid_line.startswith("("):
-                        grid_content.append(grid_line)
+                        clean_line = grid_line.strip('"')
+                        grid_content += clean_line
                     i += 1
+
+                # Parse tiles based on detected length
+                column_tiles = []
+                for j in range(0, len(grid_content), tile_length):
+                    if j + tile_length <= len(grid_content):
+                        tile_id = grid_content[j : j + tile_length]
+                        if tile_id.strip():
+                            column_tiles.append(tile_id)
 
                 # Extend map_grid if needed
                 while len(map_grid) < x_coord:
                     map_grid.append([])
 
-                map_grid[x_coord - 1] = grid_content
-
+                map_grid[x_coord - 1] = column_tiles
             i += 1
 
         # Convert to row-major format
@@ -152,10 +212,22 @@ class SS13MapTokenizer:
                     if row_idx < len(col):
                         row.append(col[row_idx])
                     else:
-                        row.append(list(tile_definitions.keys())[0])  # Default tile
+                        # Use first available tile as default
+                        default_tile = (
+                            list(self.parse_tile_definitions(map_content).keys())[0]
+                            if self.parse_tile_definitions(map_content)
+                            else "aa"
+                        )
+                        row.append(default_tile)
                 transposed_grid.append(row)
             map_grid = transposed_grid
 
+        return map_grid
+
+    def parse_dmm_map(self, map_string: str) -> Dict:
+        """Parse DMM format map string using improved methods"""
+        tile_definitions = self.parse_tile_definitions(map_string)
+        map_grid = self.parse_map_grid(map_string)
         return {"tile_definitions": tile_definitions, "map_grid": map_grid}
 
     def tokenize_map(
@@ -218,7 +290,7 @@ class SS13MapTokenizer:
 
                 tile_char = map_grid[y][x]
                 if tile_char in tile_definitions:
-                    objects = tile_definitions[tile_char]
+                    objects = list(reversed(tile_definitions[tile_char]))
 
                     # Track which layers have been used for this tile
                     used_layers = set()
@@ -431,70 +503,59 @@ class SS13MapTokenizer:
         """Get vocabulary size"""
         return len(self.token_to_id)
 
-    def get_layer_info(self) -> Dict:
-        """Get information about layer assignments"""
-        return {
-            "max_layers": self.max_layers,
-            "layer_0": "turfs only (/turf/...)",
-            "layers_1_to_n-2": f"everything else (objects, items, mobs, decals) - layers 1 to {self.max_layers-2}",
-            "layer_n-1": f"areas only (/area/...) - layer {self.max_layers-1} (never dropped)",
-            "stacking": "first-come-first-served for middle layers, excess dropped",
-            "reserved_tokens": self.reserved_tokens,
-        }
-
 
 if __name__ == "__main__":
-    tokenizer = SS13MapTokenizer("tiles.json", max_layers=8)
+    tokenizer = SS13MapTokenizer("tiles_aleph.json", max_layers=8)
 
     map_data = """
-"a" = (
+"aa" = (
 /obj/item/banner/cargo/mundane,
 /obj/machinery/light/small{
-	dir = 8
-	},
+        dir = 8
+        },
 /turf/open/floor/plating,
 /area/template_noop)
-"b" = (
+"ba" = (
 /turf/open/floor/plating,
 /area/template_noop)
-"c" = (
+"ca" = (
 /obj/item/banner/cargo/mundane,
 /turf/open/floor/plating,
 /area/template_noop)
-"d" = (
+"da" = (
 /obj/effect/decal/cleanable/molten_object/large,
 /turf/open/floor/plating,
 /area/template_noop)
-"e" = (
+"ea" = (
 /obj/effect/decal/cleanable/oil,
 /turf/open/floor/plating,
 /area/template_noop)
-"f" = (
+"fa" = (
 /obj/structure/table,
 /obj/item/candle{
-	pixel_x = -5
-	},
+        pixel_x = -5
+        },
 /obj/item/candle{
-	pixel_x = 5
-	},
+        pixel_x = 5
+        },
 /obj/item/fakeartefact,
 /obj/effect/turf_decal/arrows,
 /turf/open/floor/plating,
 /area/template_noop)
 (1,1,1) = {"
-a
-b
-e
+aa
+ba
+ea
 "}
 (2,1,1) = {"
-b
-b
-b
+ba
+ba
+ba
 "}
 (3,1,1) = {"
-c
-d
-f
+ca
+da
+fa
 "}
 """
 

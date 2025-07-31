@@ -330,9 +330,7 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = AdamW(
-            self.parameters(), lr=self.hparams.learning_rate, weight_decay=0.01
-        )
+        optimizer = AdamW(self.parameters(), lr=1e-4, weight_decay=0.01)
         # Reduce learning rate more gradually
         scheduler = CosineAnnealingLR(
             optimizer, T_max=self.trainer.max_epochs, eta_min=1e-6
