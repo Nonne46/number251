@@ -234,7 +234,7 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.model = SS13MapDiffusion(vocab_size, layers, base_channels, 256)
+        self.model = SS13MapDiffusion(vocab_size, layers, base_channels, 512)
         self.timesteps = timesteps
         self.vocab_size = vocab_size
         self.mask_prob_min = mask_prob_min

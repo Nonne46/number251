@@ -33,8 +33,14 @@ class SS13MapGenerator:
 
     @torch.no_grad()
     def generate_maps(
-        self, num_maps=1, width=16, height=16, temperature=1.0, 
-        show_progress=True, method='basic', guidance_steps=5
+        self,
+        num_maps=1,
+        width=16,
+        height=16,
+        temperature=1.0,
+        show_progress=True,
+        method="basic",
+        guidance_steps=5,
     ):
         """Generate maps using the diffusion model"""
         print(f"\nGenerating {num_maps} maps of size {width}x{height}...")
@@ -47,10 +53,14 @@ class SS13MapGenerator:
             current_batch_size = min(batch_size, num_maps - batch_start)
 
             # Generate batch
-            if method == 'guided':
+            if method == "guided":
                 maps = self._sample_batch_guided(
-                    current_batch_size, width, height, temperature, 
-                    guidance_steps, show_progress
+                    current_batch_size,
+                    width,
+                    height,
+                    temperature,
+                    guidance_steps,
+                    show_progress,
                 )
             else:
                 maps = self._sample_batch_basic(
@@ -66,29 +76,26 @@ class SS13MapGenerator:
         """Sample using the improved basic method from the model"""
         shape = (batch_size, self.model.hparams.layers, height, width)
         maps_tensor = self.model.sample(shape, self.device, temperature)
-        
-        # Post-process each map
-        for i in range(batch_size):
-            maps_tensor[i] = self.postprocess_map(maps_tensor[i])
-        
+
         # Convert to numpy
         maps_np = maps_tensor.cpu().numpy()
         return [maps_np[i] for i in range(batch_size)]
 
     def _sample_batch_guided(
-        self, batch_size, width, height, temperature=1.0, 
-        guidance_steps=5, show_progress=True
+        self,
+        batch_size,
+        width,
+        height,
+        temperature=1.0,
+        guidance_steps=5,
+        show_progress=True,
     ):
         """Sample using guided method for better quality"""
         shape = (batch_size, self.model.hparams.layers, height, width)
         maps_tensor = self.model.sample_with_guidance(
             shape, self.device, temperature, guidance_steps
         )
-        
-        # Post-process each map
-        for i in range(batch_size):
-            maps_tensor[i] = self.postprocess_map(maps_tensor[i])
-        
+
         # Convert to numpy
         maps_np = maps_tensor.cpu().numpy()
         return [maps_np[i] for i in range(batch_size)]
@@ -139,10 +146,6 @@ class SS13MapGenerator:
             unique_tokens = len(torch.unique(x))
             pbar.set_postfix({"t": t, "unique_tokens": unique_tokens})
 
-        # Post-process
-        for i in range(batch_size):
-            x[i] = self.postprocess_map(x[i])
-
         # Convert to numpy
         maps_np = x.cpu().numpy()
         return [maps_np[i] for i in range(batch_size)]
@@ -151,46 +154,50 @@ class SS13MapGenerator:
     def test_reconstruction(self, test_map, noise_level=0.3):
         """Test if model can reconstruct a given map with some noise"""
         print(f"\nTesting reconstruction with noise level {noise_level}...")
-        
+
         # Convert to tensor if needed
         if isinstance(test_map, np.ndarray):
             test_map = torch.tensor(test_map, dtype=torch.long, device=self.device)
-        
+
         if test_map.dim() == 3:
             test_map = test_map.unsqueeze(0)  # Add batch dimension
-        
+
         batch_size = test_map.shape[0]
-        
+
         # Add noise to the map
-        t = torch.full((batch_size,), int(self.model.timesteps * noise_level), device=self.device)
+        t = torch.full(
+            (batch_size,), int(self.model.timesteps * noise_level), device=self.device
+        )
         x_noisy, mask = self.model.q_sample(test_map, t)
-        
+
         print(f"Masked {mask.float().mean().item():.2%} of tokens")
-        
+
         # Try to reconstruct
         shape = test_map.shape
         x_reconstructed = self.model.sample(shape, self.device, temperature=0.8)
-        
+
         # Calculate similarity
         correct = (x_reconstructed == test_map).float().mean().item()
         print(f"Reconstruction accuracy: {correct:.2%}")
-        
+
         return x_reconstructed.cpu().numpy()
 
     def analyze_generation_quality(self, maps, sample_size=None):
         """Analyze the quality and diversity of generated maps"""
         if sample_size and len(maps) > sample_size:
             maps = maps[:sample_size]
-        
+
         print(f"\n=== Generation Quality Analysis ===")
         print(f"Analyzing {len(maps)} maps...")
-        
+
         # Convert to tensors for analysis
         maps_tensor = torch.stack([torch.tensor(m) for m in maps])
-        
+
         # Basic statistics
-        total_positions = maps_tensor.shape[0] * maps_tensor.shape[2] * maps_tensor.shape[3]
-        
+        total_positions = (
+            maps_tensor.shape[0] * maps_tensor.shape[2] * maps_tensor.shape[3]
+        )
+
         # Layer usage statistics
         layer_usage = {}
         for layer in range(maps_tensor.shape[1]):
@@ -198,25 +205,29 @@ class SS13MapGenerator:
             non_empty = (layer_data != self.tokenizer.EMPTY_ID).float().mean().item()
             unique_tokens = len(torch.unique(layer_data))
             layer_usage[layer] = {
-                'occupancy': non_empty,
-                'unique_tokens': unique_tokens
+                "occupancy": non_empty,
+                "unique_tokens": unique_tokens,
             }
-        
+
         print("\nLayer Usage:")
         for layer, stats in layer_usage.items():
             layer_type = "Turf" if layer == 0 else f"Object {layer}"
-            print(f"  Layer {layer} ({layer_type}): {stats['occupancy']:.1%} occupancy, "
-                  f"{stats['unique_tokens']} unique tokens")
-        
+            print(
+                f"  Layer {layer} ({layer_type}): {stats['occupancy']:.1%} occupancy, "
+                f"{stats['unique_tokens']} unique tokens"
+            )
+
         # Token frequency analysis
         all_tokens = maps_tensor.flatten()
         unique_tokens, counts = torch.unique(all_tokens, return_counts=True)
-        
+
         print(f"\nToken Diversity:")
         print(f"  Total unique tokens used: {len(unique_tokens)}")
-        print(f"  Vocabulary utilization: {len(unique_tokens)}/{self.model.vocab_size} "
-              f"({len(unique_tokens)/self.model.vocab_size:.1%})")
-        
+        print(
+            f"  Vocabulary utilization: {len(unique_tokens)}/{self.model.vocab_size} "
+            f"({len(unique_tokens)/self.model.vocab_size:.1%})"
+        )
+
         # Most common tokens
         top_indices = torch.argsort(counts, descending=True)[:10]
         print(f"\nMost common tokens:")
@@ -226,24 +237,25 @@ class SS13MapGenerator:
             token_name = self.tokenizer.id_to_token.get(token_id, f"<UNK:{token_id}>")
             percentage = count / len(all_tokens) * 100
             print(f"  {i+1:2d}. {token_name:<30} {count:6d} ({percentage:5.1f}%)")
-        
+
         # Map diversity (how similar are maps to each other)
         if len(maps) > 1:
             similarities = []
             for i in range(min(10, len(maps))):
-                for j in range(i+1, min(10, len(maps))):
-                    similarity = (maps_tensor[i] == maps_tensor[j]).float().mean().item()
+                for j in range(i + 1, min(10, len(maps))):
+                    similarity = (
+                        (maps_tensor[i] == maps_tensor[j]).float().mean().item()
+                    )
                     similarities.append(similarity)
-            
+
             avg_similarity = np.mean(similarities)
             print(f"\nMap Diversity:")
             print(f"  Average pairwise similarity: {avg_similarity:.1%}")
             print(f"  Diversity score: {1-avg_similarity:.1%}")
-        
+
         return layer_usage, unique_tokens, counts
 
     def tensor_to_dmm(self, tensor_map, map_name="generated", z_level=1):
-        """Convert tensor map back to DMM format"""
         layers, height, width = tensor_map.shape
 
         # Dictionary to store unique tile combinations
@@ -253,88 +265,67 @@ class SS13MapGenerator:
         # Grid to store letter codes
         grid = [[None for _ in range(width)] for _ in range(height)]
 
-        # First pass: collect all unique combinations
+        # Technical tokens to ignore
+        tech_tokens = list(self.tokenizer.reserved_tokens.keys())
+
+        # First pass: collect all unique combinations (excluding empty positions)
         all_combinations = []
         for y in range(height):
             for x in range(width):
-                # Get all objects at this position
+                # Get all objects at this position across all layers
                 objects_at_pos = []
 
-                # First, get the turf (should be in layer 0)
-                turf_token_id = int(tensor_map[0, y, x])
-                turf_token = None
-
-                if turf_token_id != self.tokenizer.EMPTY_ID:
-                    turf_token = self.tokenizer.id_to_token.get(
-                        turf_token_id, f"<UNK:{turf_token_id}>"
-                    )
-                    # Only add if it's a valid turf
-                    if turf_token.startswith("/turf/"):
-                        objects_at_pos.append(turf_token)
-
-                # Then add other objects from higher layers
-                for layer in range(1, layers):
+                for layer in range(layers):
                     token_id = int(tensor_map[layer, y, x])
-
-                    # Skip empty tokens
-                    if token_id == self.tokenizer.EMPTY_ID:
-                        continue
 
                     # Get token string
                     token = self.tokenizer.id_to_token.get(
                         token_id, f"<UNK:{token_id}>"
                     )
 
-                    # Skip special tokens and areas
-                    if token in [
-                        "<PAD>",
-                        "<MASK>",
-                        "<UNK>",
-                        "<EMPTY>",
-                    ] or token.startswith("/area/"):
+                    # Skip technical tokens
+                    if token in tech_tokens or token.startswith("<UNK:"):
                         continue
 
                     objects_at_pos.append(token)
 
-                # If no turf, use default plating
-                if not any(obj.startswith("/turf/") for obj in objects_at_pos):
-                    objects_at_pos.insert(0, "/turf/open/floor/plating")
+                # Only process non-empty positions
+                if objects_at_pos:
+                    # Create tuple for unique combination
+                    combination = tuple(objects_at_pos)
+                    if combination not in all_combinations:
+                        all_combinations.append(combination)
 
-                # Add area to the turf line (always at the end)
-                objects_at_pos.append("/area/template_noop")
-
-                # Create tuple for unique combination
-                combination = tuple(objects_at_pos)
-                if combination not in all_combinations:
-                    all_combinations.append(combination)
-
-        # Determine key format based on number of unique combinations
+        # Generate keys for all combinations (excluding empty)
         num_combinations = len(all_combinations)
 
-        # Available single characters: a-z, A-Z, 0-9
-        single_chars = list(
-            string.ascii_lowercase + string.ascii_uppercase + string.digits
-        )
+        # Available characters for keys
+        chars = list(string.ascii_lowercase + string.ascii_uppercase)
 
-        if num_combinations <= len(single_chars):
-            # Use single character keys
-            for i, combination in enumerate(all_combinations):
-                key = single_chars[i]
-                combination_to_letter[combination] = key
-                tile_combinations[key] = combination
+        # Determine key length needed
+        if num_combinations <= len(chars):
+            key_length = 1
+        elif num_combinations <= len(chars) ** 2:
+            key_length = 2
+        elif num_combinations <= len(chars) ** 3:
+            key_length = 3
         else:
-            # Use two-character keys for consistency
-            # Generate all two-character combinations
-            key_index = 0
-            for i, combination in enumerate(all_combinations):
-                # Create two-character key
-                first_char = single_chars[key_index // len(single_chars)]
-                second_char = single_chars[key_index % len(single_chars)]
-                key = first_char + second_char
+            key_length = 4  # Should be enough for most cases
 
-                combination_to_letter[combination] = key
-                tile_combinations[key] = combination
-                key_index += 1
+        # Generate keys
+        for i, combination in enumerate(all_combinations):
+            if key_length == 1:
+                key = chars[i]
+            else:
+                # Generate multi-character key
+                key = ""
+                temp_i = i
+                for _ in range(key_length):
+                    key = chars[temp_i % len(chars)] + key
+                    temp_i //= len(chars)
+
+            combination_to_letter[combination] = key
+            tile_combinations[key] = combination
 
         # Second pass: build the grid
         for y in range(height):
@@ -342,45 +333,29 @@ class SS13MapGenerator:
                 # Recreate the combination for this position
                 objects_at_pos = []
 
-                # First, get the turf
-                turf_token_id = int(tensor_map[0, y, x])
-                if turf_token_id != self.tokenizer.EMPTY_ID:
-                    turf_token = self.tokenizer.id_to_token.get(turf_token_id, "")
-                    if turf_token.startswith("/turf/"):
-                        objects_at_pos.append(turf_token)
-
-                # Then add other objects
-                for layer in range(1, layers):
+                for layer in range(layers):
                     token_id = int(tensor_map[layer, y, x])
-                    if token_id == self.tokenizer.EMPTY_ID:
+
+                    token = self.tokenizer.id_to_token.get(
+                        token_id, f"<UNK:{token_id}>"
+                    )
+
+                    if token in tech_tokens or token.startswith("<UNK:"):
                         continue
 
-                    token = self.tokenizer.id_to_token.get(token_id, "")
-                    if token not in [
-                        "<PAD>",
-                        "<MASK>",
-                        "<UNK>",
-                        "<EMPTY>",
-                    ] and not token.startswith("/area/"):
-                        objects_at_pos.append(token)
+                    objects_at_pos.append(token)
 
-                # Add default turf if needed
-                if not any(obj.startswith("/turf/") for obj in objects_at_pos):
-                    objects_at_pos.insert(0, "/turf/open/floor/plating")
-
-                # Add area
-                objects_at_pos.append("/area/template_noop")
-
-                combination = tuple(objects_at_pos)
-                grid[y][x] = combination_to_letter[combination]
+                # If completely empty, use spaces equal to key length
+                if not objects_at_pos:
+                    grid[y][x] = " " * key_length
+                else:
+                    combination = tuple(objects_at_pos)
+                    grid[y][x] = combination_to_letter[combination]
 
         # Build DMM string
         dmm_lines = []
-        dmm_lines.append(
-            "//MAP CONVERTED BY inference.py THIS HEADER COMMENT PREVENTS RECONVERSION, DO NOT REMOVE"
-        )
 
-        # Write tile definitions - sorted for consistency
+        # Write tile definitions - sorted for consistency (only non-empty combinations)
         for key in sorted(tile_combinations.keys()):
             objects = tile_combinations[key]
             dmm_lines.append(f'"{key}" = (')
@@ -394,40 +369,12 @@ class SS13MapGenerator:
         # Write grid
         dmm_lines.append(f'(1,1,{z_level}) = {{"')
 
-        # Check if we're using multi-character keys
-        key_length = len(next(iter(combination_to_letter.values())))
-
         for row in grid:
-            if key_length == 1:
-                dmm_lines.append("".join(row))
-            else:
-                # For multi-character keys, we need to ensure they're properly spaced
-                # Actually, multi-char keys in DMM are just concatenated without spaces
-                dmm_lines.append("".join(row))
+            dmm_lines.append("".join(row))
 
         dmm_lines.append('"}')
 
         return "\n".join(dmm_lines)
-
-    def postprocess_map(self, map_tensor):
-        """Clean up generated map to ensure valid SS13 structure"""
-        layers, height, width = map_tensor.shape
-
-        # Ensure layer 0 has valid turfs
-        for y in range(height):
-            for x in range(width):
-                turf_id = int(map_tensor[0, y, x])
-                turf_token = self.tokenizer.id_to_token.get(turf_id, "")
-
-                # If no turf or invalid turf, set to plating
-                if not turf_token.startswith("/turf/"):
-                    # Find the ID for basic plating
-                    plating_id = self.tokenizer.token_to_id.get(
-                        "/turf/open/floor/plating", self.tokenizer.UNK_ID
-                    )
-                    map_tensor[0, y, x] = plating_id
-
-        return map_tensor
 
     def save_maps(self, maps, output_dir="generated_maps"):
         """Save generated maps as DMM files"""
@@ -510,12 +457,17 @@ def main():
         "--temperature", type=float, default=1.0, help="Sampling temperature"
     )
     parser.add_argument(
-        "--method", type=str, default='basic', choices=['basic', 'guided', 'legacy'],
-        help="Sampling method (basic=improved, guided=high quality, legacy=old method)"
+        "--method",
+        type=str,
+        default="basic",
+        choices=["basic", "guided", "legacy"],
+        help="Sampling method (basic=improved, guided=high quality, legacy=old method)",
     )
     parser.add_argument(
-        "--guidance-steps", type=int, default=5, 
-        help="Number of guidance steps for guided sampling"
+        "--guidance-steps",
+        type=int,
+        default=5,
+        help="Number of guidance steps for guided sampling",
     )
     parser.add_argument(
         "--output-dir", type=str, default="generated_maps", help="Output directory"
@@ -546,7 +498,7 @@ def main():
         height=args.height,
         temperature=args.temperature,
         method=args.method,
-        guidance_steps=args.guidance_steps
+        guidance_steps=args.guidance_steps,
     )
 
     # Analyze quality if requested
