@@ -49,6 +49,12 @@ class SS13MapGenerator:
         batch_size = min(num_maps, 4)  # Generate in batches of 4
         all_maps = []
 
+        # Progress bar for batches
+        total_batches = (num_maps + batch_size - 1) // batch_size
+        batch_pbar = tqdm(
+            total=total_batches, desc="Generating batches", disable=not show_progress
+        )
+
         for batch_start in range(0, num_maps, batch_size):
             current_batch_size = min(batch_size, num_maps - batch_start)
 
@@ -67,7 +73,9 @@ class SS13MapGenerator:
                     current_batch_size, width, height, temperature, show_progress
                 )
             all_maps.extend(maps)
+            batch_pbar.update(1)
 
+        batch_pbar.close()
         return all_maps
 
     def _sample_batch_basic(
@@ -75,7 +83,11 @@ class SS13MapGenerator:
     ):
         """Sample using the improved basic method from the model"""
         shape = (batch_size, self.model.hparams.layers, height, width)
-        maps_tensor = self.model.sample(shape, self.device, temperature)
+
+        # Call the model's sample method directly with progress tracking
+        maps_tensor = self.model.sample(
+            shape, self.device, temperature, show_progress=show_progress
+        )
 
         # Convert to numpy
         maps_np = maps_tensor.cpu().numpy()
@@ -92,8 +104,10 @@ class SS13MapGenerator:
     ):
         """Sample using guided method for better quality"""
         shape = (batch_size, self.model.hparams.layers, height, width)
+
+        # Call the model's sample_with_guidance method directly with progress tracking
         maps_tensor = self.model.sample_with_guidance(
-            shape, self.device, temperature, guidance_steps
+            shape, self.device, temperature, guidance_steps, show_progress=show_progress
         )
 
         # Convert to numpy
@@ -174,7 +188,11 @@ class SS13MapGenerator:
 
         # Try to reconstruct
         shape = test_map.shape
-        x_reconstructed = self.model.sample(shape, self.device, temperature=0.8)
+
+        # Call the model's sample method directly with progress tracking
+        x_reconstructed = self.model.sample(
+            shape, self.device, temperature=0.8, show_progress=True
+        )
 
         # Calculate similarity
         correct = (x_reconstructed == test_map).float().mean().item()

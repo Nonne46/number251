@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from tqdm import tqdm
 
 
 class SinusoidalPositionEmbeddings(nn.Module):
@@ -338,32 +339,35 @@ class SS13MapDiffusionLightning(pl.LightningModule):
         return [optimizer], [scheduler]
 
     @torch.no_grad()
-    def sample(self, shape, device, temperature=1.0, top_k=None, top_p=0.9):
+    def sample(
+        self, shape, device, temperature=1.0, top_k=None, top_p=0.9, show_progress=True
+    ):
         """Generate new maps using iterative demasking with better sampling"""
         batch_size, layers, h, w = shape
-
         # Start with random tokens, but bias toward common tokens
         # Get token frequencies from a reference (you should pass this in)
         x = torch.randint(0, self.vocab_size, (batch_size, layers, h, w), device=device)
 
-        # Iteratively denoise
-        for t in reversed(range(self.timesteps)):
-            t_batch = torch.full((batch_size,), t, device=device)
+        # Create progress bar
+        pbar = tqdm(
+            reversed(range(self.timesteps)),
+            desc="Basic sampling",
+            disable=not show_progress,
+        )
 
+        # Iteratively denoise
+        for t in pbar:
+            t_batch = torch.full((batch_size,), t, device=device)
             # Predict logits
             logits = self(x, t_batch)  # (batch, layers, vocab_size, h, w)
-
             # Apply temperature
             logits = logits / temperature
-
             # Get probabilities
             probs = F.softmax(logits, dim=2)
-
             # Sample new tokens
             probs_flat = probs.permute(0, 1, 3, 4, 2).reshape(-1, self.vocab_size)
             sampled_tokens = torch.multinomial(probs_flat, num_samples=1)
             sampled_tokens = sampled_tokens.reshape(batch_size, layers, h, w)
-
             if t > 0:
                 update_prob = max(
                     0.1, self.mask_probs[t - 1].item() * 0.3
@@ -371,35 +375,44 @@ class SS13MapDiffusionLightning(pl.LightningModule):
                 update_mask = (
                     torch.rand(batch_size, layers, h, w, device=device) < update_prob
                 )
-
                 x = torch.where(update_mask, sampled_tokens, x)
             else:
                 x = sampled_tokens
 
+            # Update progress bar
+            unique_tokens = len(torch.unique(x))
+            pbar.set_postfix({"timestep": t, "unique_tokens": unique_tokens})
+
         return x
 
     @torch.no_grad()
-    def sample_with_guidance(self, shape, device, temperature=1.0, guidance_steps=5):
+    def sample_with_guidance(
+        self, shape, device, temperature=1.0, guidance_steps=5, show_progress=True
+    ):
         """Enhanced sampling with self-guidance"""
         batch_size, layers, h, w = shape
-
         # Start with random tokens
         x = torch.randint(0, self.vocab_size, (batch_size, layers, h, w), device=device)
 
-        for t in reversed(range(self.timesteps)):
-            t_batch = torch.full((batch_size,), t, device=device)
+        # Create progress bar
+        pbar = tqdm(
+            reversed(range(self.timesteps)),
+            desc="Guided sampling",
+            disable=not show_progress,
+        )
 
+        for t in pbar:
+            t_batch = torch.full((batch_size,), t, device=device)
             # Multiple guidance steps at each timestep
-            for _ in range(guidance_steps if t > self.timesteps // 2 else 1):
+            current_guidance_steps = guidance_steps if t > self.timesteps // 2 else 1
+            for _ in range(current_guidance_steps):
                 logits = self(x, t_batch)
                 logits = logits / temperature
                 probs = F.softmax(logits, dim=2)
-
                 # Sample with higher confidence
                 probs_flat = probs.permute(0, 1, 3, 4, 2).reshape(-1, self.vocab_size)
                 sampled_tokens = torch.multinomial(probs_flat, num_samples=1)
                 sampled_tokens = sampled_tokens.reshape(batch_size, layers, h, w)
-
                 if t > 0:
                     # Only update most uncertain positions
                     confidence = torch.max(probs, dim=2)[0]
@@ -408,5 +421,15 @@ class SS13MapDiffusionLightning(pl.LightningModule):
                     x = torch.where(update_mask, sampled_tokens, x)
                 else:
                     x = sampled_tokens
+
+            # Update progress bar
+            unique_tokens = len(torch.unique(x))
+            pbar.set_postfix(
+                {
+                    "timestep": t,
+                    "unique_tokens": unique_tokens,
+                    "guidance_steps": current_guidance_steps,
+                }
+            )
 
         return x
