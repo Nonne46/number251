@@ -277,9 +277,6 @@ class ContinuousMapGenerator:
             else:
                 chunk_tensor = chunk
 
-            # Post-process to ensure valid structure
-            chunk_tensor = self.generator.postprocess_map(chunk_tensor)
-
             # Place chunk in full map
             full_map[
                 :, pos_y : pos_y + self.chunk_size, pos_x : pos_x + self.chunk_size
@@ -353,9 +350,6 @@ class ContinuousMapGenerator:
                 )
             else:
                 refined_tensor = refined_chunk
-
-            # Post-process to ensure valid structure
-            refined_tensor = self.generator.postprocess_map(refined_tensor)
 
             # Place back in full map
             map_tensor[
